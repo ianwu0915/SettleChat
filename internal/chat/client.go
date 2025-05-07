@@ -7,14 +7,14 @@ import (
 )
 
 // Define Client Struct
-
+// Represnet a Websocker connection with a user and a corresponding room
 type Client struct {
-	hub *Hub
+	Hub *Hub
 	ID       string
 	Username string
 	Conn     *websocket.Conn
-	Send     chan ChatMessage // Message Received from broadcast
-	Room     *Room
+	Send     chan ChatMessage // Message received from broadcast to the room 
+	RoomID   string
 }
 
 // Define Message Struct
@@ -71,7 +71,7 @@ func (c *Client) WritePump() {
 func (c *Client) ReadPump() {
 
 	defer func() {
-		c.hub.UnRegister <- c
+		c.Hub.UnRegister <- c
 		c.Conn.Close()
 	}()
 
@@ -86,12 +86,13 @@ func (c *Client) ReadPump() {
 			break
 		}
 		// 補上其他field
-		msg.RoomID = c.Room.ID
+		msg.RoomID = c.RoomID
 		msg.SenderID = c.ID
 		msg.Sender = c.Username
 		msg.Timestamp = time.Now()
 
-		c.Room.Broadcast <- msg
+		room := c.Hub.getOrCreateRoom(c.RoomID)
+		room.Broadcast <- msg
 
 	}
 }

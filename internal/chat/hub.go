@@ -11,7 +11,7 @@ type Hub struct {
 	mu sync.Mutex
 }
 
-func newHub() *Hub {
+func NewHub() *Hub {
 	return &Hub{
 		Rooms: make(map[string]*Room),
 		Register: make(chan *Client),
@@ -37,13 +37,13 @@ func (h *Hub) Run() {
 	for {
 		select {
 		case client := <- h.Register:
-			room := h.getOrCreateRoom(client.Room.ID)
+			room := h.getOrCreateRoom(client.RoomID)
 			room.AddClient(client)
 
 		// Handle User Leave
 		case client := <-h.UnRegister:
 			// If the room exist
-			if room, ok := h.Rooms[client.Room.ID]; ok {
+			if room, ok := h.Rooms[client.RoomID]; ok {
 				room.RemoveClient(client)
 				if len(room.Clients) == 0 {
 					h.mu.Lock()
