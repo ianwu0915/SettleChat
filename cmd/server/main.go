@@ -18,8 +18,9 @@ func main() {
 
 	// Acticate the Sercer
 	addr := ":8080"
+	log.Println("WebSocket server listening on", addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatal("ListenAndServer:", err)
 	}
-	
+
 }
