@@ -2,7 +2,6 @@ package chat
 
 import (
 	"log"
-	"golang.org/x/text/message"
 )
 
 // What we do in Room: Fire a GoRoutine
@@ -14,8 +13,6 @@ type Room struct {
 	ID string
 	Clients map[string]*Client // userId -> Client
 	Broadcast chan ChatMessage 
-	Register chan *Client
-	Unregister chan *Client 
 }
 
 func NewRoom(id string) *Room {
@@ -23,39 +20,35 @@ func NewRoom(id string) *Room {
 		ID: id,
 		Clients: make(map[string]*Client),
 		Broadcast: make(chan ChatMessage),
-		Register: make(chan *Client),
-		Unregister: make(chan *Client),
+	}
+}
+
+func (r *Room) AddClient(client *Client) {
+	r.Clients[client.ID] = client
+	log.Printf("[%s] %s joined", r.ID, client.Username)
+}
+
+func (r *Room) RemoveClient(client *Client) {
+	if _, exisit := r.Clients[client.ID]; exisit {
+		delete(r.Clients, client.ID)
+		close(client.Send)
+		log.Printf("[%s] %s left", r.ID, client.Username)
 	}
 }
 
 func (r *Room) Run () {
 	for {
-		select {
-		// Handle User Join 
-		case client := <- r.Register:
-			r.Clients[client.ID] = client
-			log.Printf("[%s] %s joined", client.ID, client.Username)
-		// Handle User Leave
-		case client := <-r.Unregister:
-			delete(r.Clients, client.ID)
+		message := <-r.Broadcast
+		for _, client := range r.Clients {
 
-			// Prevent client from receivign message
-			close(client.Send)
-			log.Printf("[%s] %s left", client.ID, client.Username)
-		
-		// Handle Message broadcast
-		case message := <-r.Broadcast:
-			for _, client := range r.Clients {
-
-				// non-blocking 
-				select {
-				case client.Send <- message:
-					
-				// If client is offline, or other problems
-				default:
-					close(client.Send)
-					delete(r.Clients, client.ID)
-				}
+			// non-blocking 
+			select {
+			case client.Send <- message:
+				
+			// If client is offline, or other problems
+			default:
+				close(client.Send)
+				delete(r.Clients, client.ID)
 			}
 		}
 	}

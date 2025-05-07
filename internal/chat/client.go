@@ -9,6 +9,7 @@ import (
 // Define Client Struct
 
 type Client struct {
+	hub *Hub
 	ID       string
 	Username string
 	Conn     *websocket.Conn
@@ -70,7 +71,7 @@ func (c *Client) WritePump() {
 func (c *Client) ReadPump() {
 
 	defer func() {
-		c.Room.Unregister <- c
+		c.hub.UnRegister <- c
 		c.Conn.Close()
 	}()
 
