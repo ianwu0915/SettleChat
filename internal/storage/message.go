@@ -12,7 +12,7 @@ func (p *PostgresStore) SaveMessage(ctx context.Context, msg ChatMessage) error 
 	return err
 }
 
-func (p *PostgresStore) GetRecentMessage(ctx context.Context, roomId string, limit int) ([]ChatMessage, error) {
+func (p *PostgresStore) GetRecentMessages(ctx context.Context, roomId string, limit int) ([]ChatMessage, error) {
 	rows, err := p.DB.Query(ctx, `
 		SELECT id, room_id, sender_id, sender, content, timestamp 
 		FROM messages 

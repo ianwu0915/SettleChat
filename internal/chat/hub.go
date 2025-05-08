@@ -1,8 +1,10 @@
 package chat
 
 import (
+	"context"
+	"log"
 	"sync"
-
+	"time"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
@@ -10,11 +12,11 @@ type Hub struct {
 	Rooms      map[string]*Room
 	Register   chan *Client
 	UnRegister chan *Client
-	Store      storage.PostgresStore
+	Store      *storage.PostgresStore
 	mu         sync.Mutex
 }
 
-func NewHub(store storage.PostgresStore) *Hub {
+func NewHub(store *storage.PostgresStore) *Hub {
 	return &Hub{
 		Rooms:      make(map[string]*Room),
 		Register:   make(chan *Client),
@@ -43,6 +45,17 @@ func (h *Hub) Run() {
 		case client := <-h.Register:
 			room := h.getOrCreateRoom(client.RoomID)
 			room.AddClient(client)
+			msgs, err := client.Hub.Store.GetRecentMessages(context.Background(), client.RoomID, 50)
+			if err != nil {
+				log.Printf("Error Retrieving Past Message from databases: %v", err)
+			}
+			for _, msg := range msgs {
+				select {
+				case client.Send <- msg:
+				case <-time.After(2 * time.Second):
+					log.Printf("⚠️ timed out sending history to %s", client.ID)
+				}
+			}
 
 		// Handle User Leave
 		case client := <-h.UnRegister:

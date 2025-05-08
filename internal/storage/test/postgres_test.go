@@ -60,7 +60,7 @@ func TestSaveAndQueryMessages(t *testing.T) {
 		t.Fatalf("Save Message failed: %v", err)
 	}
 
-	msgs, err := store.GetRecentMessage(context.Background(), roomID, 5)
+	msgs, err := store.GetRecentMessages(context.Background(), roomID, 5)
 	if err != nil {
 		t.Fatalf("GetRecentMessages failed: %v", err)
 	}

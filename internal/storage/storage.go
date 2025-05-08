@@ -6,12 +6,12 @@ import (
 )
 
 type ChatMessage struct {
-	ID        int
-	RoomID    string
-	SenderID  string
-	Sender    string
-	Content   string
-	Timestamp time.Time
+	ID        int       `json:"-"` // 不 expose 給前端
+	RoomID    string    `json:"room_id"`
+	SenderID  string    `json:"sender_id"`
+	Sender    string    `json:"sender"`
+	Content   string    `json:"content"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 type User struct {
