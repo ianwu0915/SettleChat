@@ -59,6 +59,23 @@ func (p *PostgresStore) migrate(ctx context.Context) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active);
+
+	CREATE TABLE rooms (
+		id TEXT PRIMARY KEY,           -- UUID 
+		roomname TEXT NOT NULL,            -- 顯示用名稱
+		created_by TEXT NOT NULL,      -- 使用者 ID
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE room_members (
+		user_id TEXT NOT NULL,
+		room_id TEXT NOT NULL,
+		joined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (user_id, room_id),
+		FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_rooms_members_room_id ON room_members (room_id);
 	`)
 
 	return err

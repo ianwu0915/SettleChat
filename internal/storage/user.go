@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"time"
+
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -58,7 +59,7 @@ func (p *PostgresStore) Login(ctx context.Context, username, password string) (s
 func (p *PostgresStore) GetUserByID(ctx context.Context, userID string) (*User, error) {
 	row := p.DB.QueryRow(ctx, `SELECT id, username, last_active, created_at FROM users WHERE id=$1`, userID)
 	var u User
-	if err := row.Scan(&u.ID, &u.Username, &u.LastActive, &u.CreatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.UserName, &u.LastActive, &u.CreatedAt); err != nil {
 		return nil, err
 	}
 	return &u, nil
@@ -71,7 +72,7 @@ func (p *PostgresStore) UpsertUser(ctx context.Context, user User) error {
 		ON CONFLICT (id) DO UPDATE
 		SET username = EXCLUDED.username,
 		    last_active = EXCLUDED.last_active
-	`, user.ID, user.Username, user.LastActive, user.CreatedAt)
+	`, user.ID, user.UserName, user.LastActive, user.CreatedAt)
 	return err
 }
 

@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 func TestUpsertUser(t *testing.T) {
 	user := storage.User{
 		ID:         "test_user_1",
-		Username:   "TestUser",
+		UserName:   "TestUser",
 		LastActive: time.Now().UTC(),
 		CreatedAt:  time.Now().UTC(),
 	}
