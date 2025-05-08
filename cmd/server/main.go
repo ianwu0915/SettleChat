@@ -5,9 +5,10 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ianwu0915/SettleChat/cmd/server/handler"
 	"github.com/ianwu0915/SettleChat/internal/chat"
-	"github.com/ianwu0915/SettleChat/internal/ws"
 	"github.com/ianwu0915/SettleChat/internal/storage"
+	"github.com/ianwu0915/SettleChat/internal/ws"
 	"github.com/joho/godotenv"
 )
 
@@ -29,14 +30,18 @@ func main() {
 	hub := chat.NewHub(store)
 	go hub.Run()
 
+	authHandler := handler.NewAuthHandler(store)
 
+	mux := http.NewServeMux()
 	// Register WsHandler
-	http.HandleFunc("/ws", ws.WebsocketHandler(hub))
+	mux.HandleFunc("/ws", ws.WebsocketHandler(hub))
+	mux.Handle("/register", http.HandlerFunc(authHandler.Register))
+	mux.Handle("/login", http.HandlerFunc(authHandler.Login))
 
 	// Acticate the Sercer
 	addr := ":8080"
 	log.Println("WebSocket server listening on", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatal("ListenAndServer:", err)
 	}
 }
