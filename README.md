@@ -1,3 +1,5 @@
+
+### Module 
 settlechat/
 │
 ├── cmd/
@@ -18,3 +20,15 @@ settlechat/
 ├── go.mod
 ├── go.sum
 └── README.md
+
+
+## What is in mind when scale up
+
+1. Assigning a Client to a Server => Load Balancing + Consistent Hashing
+2. Read/Write Optimization with choices of databases
+3. Middleware Like Kafka/Flink to handle high message throughput for a chatserver
+4. Caching 
+5. Distirubuted ID?
+6. Persistent Client connection with Server using Zookeeper and Load-balancer
+7. 存新傳的message到資料庫之前，先傳到群組 ，透過flink or Kafka Streaming 
+8. Change Current Design Using a single websocket connection for each server

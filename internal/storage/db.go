@@ -52,9 +52,10 @@ func (p *PostgresStore) migrate(ctx context.Context) error {
 
 	CREATE TABLE IF NOT EXISTS users (
 		id TEXT PRIMARY KEY,
-		username TEXT NOT NULL,
+		username TEXT UNIQUE NOT NULL,
+		password_hash TEXT NOT NULL,
+		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
 		last_active TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active);

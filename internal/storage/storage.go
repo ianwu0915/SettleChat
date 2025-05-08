@@ -26,10 +26,11 @@ type User struct {
 
 type MessageStore interface {
 	SaveMessage(ctx context.Context, msg ChatMessage) error 
-	GetRecentMessage(ctx context.Context, roomID string, limit int) ([]ChatMessage, error)
+	GetRecentMessages(ctx context.Context, roomID string, limit int) ([]ChatMessage, error)
 }
 
 type UserStore interface {
+	// Regiser and Login
 	UpsertUser(ctx context.Context, user User) error // insert or update
 	UpdateLastActive(ctx context.Context, userID string) error
 	GetUser(ctx context.Context, userId string) (*User, error)
