@@ -31,12 +31,17 @@ func main() {
 	go hub.Run()
 
 	authHandler := handler.NewAuthHandler(store)
+	roomHandler := handler.NewRoomHandler(store)
 
 	mux := http.NewServeMux()
 	// Register WsHandler
 	mux.HandleFunc("/ws", ws.WebsocketHandler(hub))
-	mux.Handle("/register", http.HandlerFunc(authHandler.Register))
-	mux.Handle("/login", http.HandlerFunc(authHandler.Login))
+	mux.Handle("POST /register", http.HandlerFunc(authHandler.Register))
+	mux.Handle("POST /login", http.HandlerFunc(authHandler.Login))
+	mux.Handle("GET /user", http.HandlerFunc(authHandler.GetUserByID))
+	mux.Handle("POST /rooms/create", http.HandlerFunc(roomHandler.CreateRoom))
+	mux.Handle("POST /rooms/join", http.HandlerFunc(roomHandler.JoinRoom))
+	mux.Handle("GET /rooms", http.HandlerFunc(roomHandler.GetUserRooms))
 
 	// Acticate the Sercer
 	addr := ":8080"

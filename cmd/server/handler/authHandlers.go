@@ -57,3 +57,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(authResponse{UserID: userID})
 }
 
+func (h *AuthHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
+	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		http.Error(w, "missing user_id", http.StatusBadRequest)
+		return
+	}
+
+	user, err := h.DB.GetUserByID(context.Background(), userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return	
+	}
+
+	json.NewEncoder(w).Encode(user)
+}
+
