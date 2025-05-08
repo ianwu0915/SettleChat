@@ -3,17 +3,18 @@ package chat
 import (
 	"log"
 	"time"
+
 	"github.com/gorilla/websocket"
 )
 
 // Define Client Struct
 // Represnet a Websocker connection with a user and a corresponding room
 type Client struct {
-	Hub *Hub
+	Hub      *Hub
 	ID       string
 	Username string
 	Conn     *websocket.Conn
-	Send     chan ChatMessage // Message received from broadcast to the room 
+	Send     chan ChatMessage // Message received from broadcast to the room
 	RoomID   string
 }
 
@@ -69,7 +70,7 @@ func (c *Client) WritePump() {
 
 // Read the message input from the front-end passed into Websocket and pass into Room.Broadcast
 func (c *Client) ReadPump() {
-
+	log.Printf("client connected: %s (%s) in room %s", c.Username, c.ID, c.RoomID)
 	defer func() {
 		c.Hub.UnRegister <- c
 		c.Conn.Close()
@@ -80,11 +81,25 @@ func (c *Client) ReadPump() {
 	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
 		var msg ChatMessage
+		log.Println("waiting for message...")
 		// 會接收content
 		if err := c.Conn.ReadJSON(&msg); err != nil {
 			log.Println("read error: ", err)
 			break
 		}
+
+		log.Printf("[%s] %s: %s ", c.ID, c.Username, msg.Content)
+		
+
+		// if err := c.Conn.ReadJSON(&msg); err != nil {
+		// 	if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+		// 		log.Println("unexpected close error:", err)
+		// 	} else {
+		// 		log.Println("client closed connection:", err)
+		// 	}
+		// 	break
+		// }
+		
 		// 補上其他field
 		msg.RoomID = c.RoomID
 		msg.SenderID = c.ID

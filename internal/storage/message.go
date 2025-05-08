@@ -8,7 +8,7 @@ func (p *PostgresStore) SaveMessage(ctx context.Context, msg ChatMessage) error 
 	_, err := p.DB.Exec(ctx, `
 		INSERT INTO messages (room_id, sender_id, sender, content, timestamp)
 		VALUES ($1, $2, $3, $4, $5)
-	`, msg.RoomID, msg.Sender, msg.SenderID, msg.Sender, msg.Timestamp)
+	`, msg.RoomID, msg.SenderID, msg.Sender, msg.Content, msg.Timestamp)
 	return err
 }
 

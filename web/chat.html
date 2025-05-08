@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SettleChat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #joinForm, #chatContainer {
+      padding: 20px;
+    }
+    #chatContainer {
+      display: none;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .message {
+      margin: 5px 0;
+    }
+    .me {
+      text-align: right;
+      color: blue;
+    }
+    .other {
+      text-align: left;
+      color: green;
+    }
+    #inputBox {
+      display: flex;
+    }
+    #inputBox input {
+      flex: 1;
+      padding: 10px;
+    }
+    #inputBox button {
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="joinForm">
+    <h2>SettleChat</h2>
+    <input id="username" placeholder="Enter your name" />
+    <input id="room" placeholder="Room name" />
+    <button onclick="joinChat()">Join</button>
+  </div>
+
+  <div id="chatContainer">
+    <h3 id="roomHeader"></h3>
+    <div id="messages"></div>
+    <div id="inputBox">
+      <input id="msgInput" placeholder="Type a message" />
+      <button onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    let socket;
+    let username = "";
+    let userID = Date.now().toString(); // simple unique ID
+
+    function joinChat() {
+      username = document.getElementById('username').value.trim();
+      const room = document.getElementById('room').value.trim();
+      if (!username || !room) {
+        alert("Please enter username and room name");
+        return;
+      }
+      document.getElementById('joinForm').style.display = 'none';
+      document.getElementById('chatContainer').style.display = 'flex';
+      document.getElementById('roomHeader').innerText = `Room: ${room}`;
+
+      socket = new WebSocket(`ws://localhost:8080/ws?room=${room}&user_id=${userID}&username=${username}`);
+
+      socket.onmessage = (event) => {
+        const msg = JSON.parse(event.data);
+        const isMe = msg.sender_id === userID;
+        const el = document.createElement("div");
+        el.className = `message ${isMe ? 'me' : 'other'}`;
+        el.textContent = `[${msg.sender}] ${msg.content}`;
+        document.getElementById("messages").appendChild(el);
+        document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+      };
+    }
+
+    function sendMessage() {
+      const input = document.getElementById("msgInput");
+      const msg = input.value.trim();
+      if (msg && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ content: msg }));
+        input.value = "";
+      }
+    }
+  </script>
+</body>
+</html>

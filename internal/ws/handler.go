@@ -9,7 +9,7 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	ReadBufferSize: 1024,
+	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
 		return true // dev, prod -> origin whitelist
@@ -26,7 +26,7 @@ func WebsocketHandler(hub *chat.Hub) http.HandlerFunc {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("Error upgrading", err)
-			return 
+			return
 		}
 
 		// Get all the info :roomId, userId, username from from the URL query parameters
@@ -39,18 +39,18 @@ func WebsocketHandler(hub *chat.Hub) http.HandlerFunc {
 			http.Error(w, "Missing room/user_id/username", http.StatusBadRequest)
 			return
 		}
-		
-		// Construct Client 
+
+		// Construct Client
 		client := &chat.Client{
-			Hub: hub,
-			ID: userID,
+			Hub:      hub,
+			ID:       userID,
 			Username: username,
-			Conn: conn,
-			Send: make(chan chat.ChatMessage),
-			RoomID: roomID,
+			Conn:     conn,
+			Send:     make(chan chat.ChatMessage),
+			RoomID:   roomID,
 		}
 
-		// Register the client into the room 
+		// Register the client into the room
 		hub.Register <- client
 
 		go client.WritePump()
@@ -59,4 +59,3 @@ func WebsocketHandler(hub *chat.Hub) http.HandlerFunc {
 	}
 
 }
-

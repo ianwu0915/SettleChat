@@ -10,15 +10,15 @@ import (
 // Room will broadcast the message to every users in the room
 
 type Room struct {
-	ID string
-	Clients map[string]*Client // userId -> Client
-	Broadcast chan ChatMessage 
+	ID        string
+	Clients   map[string]*Client // userId -> Client
+	Broadcast chan ChatMessage
 }
 
 func NewRoom(id string) *Room {
 	return &Room{
-		ID: id,
-		Clients: make(map[string]*Client),
+		ID:        id,
+		Clients:   make(map[string]*Client),
 		Broadcast: make(chan ChatMessage),
 	}
 }
@@ -36,15 +36,15 @@ func (r *Room) RemoveClient(client *Client) {
 	}
 }
 
-func (r *Room) Run () {
+func (r *Room) Run() {
 	for {
 		message := <-r.Broadcast
 		for _, client := range r.Clients {
 
-			// non-blocking 
+			// non-blocking
 			select {
 			case client.Send <- message:
-				
+
 			// If client is offline, or other problems
 			default:
 				close(client.Send)
