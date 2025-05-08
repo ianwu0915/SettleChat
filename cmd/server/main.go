@@ -14,15 +14,20 @@ import (
 func main() {
 
 	godotenv.Load(".env")
-	dbURL := os.Getenv("DATABASE_URL")
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("DATABASE_URL not set")
+	}
+	// Connected to Postgres
+	store, err := storage.NewPostgresStore(dsn)
+	if err != nil {
+		log.Fatalf("Failed to connect to Postgres: %v", err)
+	}
 
 
 	// Creat a hub
-	hub := chat.NewHub()
+	hub := chat.NewHub(store)
 	go hub.Run()
-
-	// // Connected to Postgres
-	// store, err := storage.NewPostgresStore(dbURL)
 
 
 	// Register WsHandler

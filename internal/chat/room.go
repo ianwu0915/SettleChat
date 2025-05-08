@@ -2,6 +2,7 @@ package chat
 
 import (
 	"log"
+	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
 // What we do in Room: Fire a GoRoutine
@@ -12,14 +13,14 @@ import (
 type Room struct {
 	ID        string
 	Clients   map[string]*Client // userId -> Client
-	Broadcast chan ChatMessage
+	Broadcast chan storage.ChatMessage
 }
 
 func NewRoom(id string) *Room {
 	return &Room{
 		ID:        id,
 		Clients:   make(map[string]*Client),
-		Broadcast: make(chan ChatMessage),
+		Broadcast: make(chan storage.ChatMessage),
 	}
 }
 

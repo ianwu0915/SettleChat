@@ -6,6 +6,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/ianwu0915/SettleChat/internal/chat"
+	"github.com/ianwu0915/SettleChat/internal/storage"
+	
 )
 
 var upgrader = websocket.Upgrader{
@@ -46,7 +48,7 @@ func WebsocketHandler(hub *chat.Hub) http.HandlerFunc {
 			ID:       userID,
 			Username: username,
 			Conn:     conn,
-			Send:     make(chan chat.ChatMessage),
+			Send:     make(chan storage.ChatMessage),
 			RoomID:   roomID,
 		}
 

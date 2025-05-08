@@ -2,20 +2,24 @@ package chat
 
 import (
 	"sync"
+
+	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
 type Hub struct {
 	Rooms      map[string]*Room
 	Register   chan *Client
 	UnRegister chan *Client
+	Store      storage.PostgresStore
 	mu         sync.Mutex
 }
 
-func NewHub() *Hub {
+func NewHub(store storage.PostgresStore) *Hub {
 	return &Hub{
 		Rooms:      make(map[string]*Room),
 		Register:   make(chan *Client),
 		UnRegister: make(chan *Client),
+		Store: store,
 	}
 }
 

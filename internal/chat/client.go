@@ -1,10 +1,12 @@
 package chat
 
 import (
+	"context"
 	"log"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
 // Define Client Struct
@@ -14,18 +16,18 @@ type Client struct {
 	ID       string
 	Username string
 	Conn     *websocket.Conn
-	Send     chan ChatMessage // Message received from broadcast to the room
+	Send     chan storage.ChatMessage // Message received from broadcast to the room
 	RoomID   string
 }
 
-// Define Message Struct
-type ChatMessage struct {
-	RoomID    string    `json:"room_id"`
-	SenderID  string    `json:"sender_id"`
-	Sender    string    `json:"sender"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
-}
+// // Define Message Struct
+// type ChatMessage struct {
+// 	RoomID    string    `json:"room_id"`
+// 	SenderID  string    `json:"sender_id"`
+// 	Sender    string    `json:"sender"`
+// 	Content   string    `json:"content"`
+// 	Timestamp time.Time `json:"timestamp"`
+// }
 
 const (
 	writeWait      = 10 * time.Second
@@ -80,7 +82,7 @@ func (c *Client) ReadPump() {
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 	for {
-		var msg ChatMessage
+		var msg storage.ChatMessage
 		log.Println("waiting for message...")
 		// 會接收content
 		if err := c.Conn.ReadJSON(&msg); err != nil {
@@ -105,6 +107,10 @@ func (c *Client) ReadPump() {
 		msg.SenderID = c.ID
 		msg.Sender = c.Username
 		msg.Timestamp = time.Now()
+
+		if err := c.Hub.Store.SaveMessage(context.Background(), msg); err != nil {
+			log.Printf("❌ failed to save message to DB: %v", err)
+		}
 
 		room := c.Hub.getOrCreateRoom(c.RoomID)
 		room.Broadcast <- msg
