@@ -2,9 +2,10 @@ package storage
 
 import (
 	"context"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"log"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgresStore struct {
@@ -36,7 +37,6 @@ func NewPostgresStore(dsn string) (*PostgresStore, error) {
 // ORDER BY timestamp DESC
 // LIMIT 50;
 
-
 func (p *PostgresStore) migrate(ctx context.Context) error {
 	_, err := p.DB.Exec(ctx, `
 	CREATE TABLE IF NOT EXISTS messages (
@@ -55,19 +55,19 @@ func (p *PostgresStore) migrate(ctx context.Context) error {
 		username TEXT UNIQUE NOT NULL,
 		password_hash TEXT NOT NULL,
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-		last_active TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+		last_active TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_users_last_active ON users (last_active);
 
-	CREATE TABLE rooms (
+	CREATE TABLE IF NOT EXISTS rooms (
 		id TEXT PRIMARY KEY,           -- UUID 
 		roomname TEXT NOT NULL,            -- 顯示用名稱
 		created_by TEXT NOT NULL,      -- 使用者 ID
 		created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 	);
 
-	CREATE TABLE room_members (
+	CREATE TABLE IF NOT EXISTS room_members (
 		user_id TEXT NOT NULL,
 		room_id TEXT NOT NULL,
 		joined_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,

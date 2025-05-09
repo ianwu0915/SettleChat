@@ -3,17 +3,19 @@ package storage
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func (p *PostgresStore) Register (ctx context.Context, username, password string) (string, error) {
+func (p *PostgresStore) Register(ctx context.Context, username, password string) (string, error) {
 	// Check if the current username exist
 	var exists bool
 	err := p.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE username=$1)`, username).Scan(&exists)
 	if err != nil {
+		log.Printf("Check User Exists Failed: %s", err)
 		return "", err
 	}
 
@@ -23,6 +25,7 @@ func (p *PostgresStore) Register (ctx context.Context, username, password string
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost) // what is Cost?
 	if err != nil {
+		log.Println("Hashing Failed")
 		return "", err
 	}
 
@@ -31,30 +34,32 @@ func (p *PostgresStore) Register (ctx context.Context, username, password string
 		INSERT INTO users(id, username, password_hash, created_at)
 		VALUES ($1, $2, $3, $4)
 	`, userID, username, string(hash), time.Now().UTC())
-	
+
 	if err != nil {
+		log.Println("Inserting Failed")
 		return "", err
 	}
 
 	return userID, nil
-	
+
 }
 
 func (p *PostgresStore) Login(ctx context.Context, username, password string) (string, error) {
 	var userID, hash string
-	err := p.DB.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE username=$1)`, username).Scan(&userID, &hash)
+	err := p.DB.QueryRow(ctx, `SELECT id, password_hash FROM users WHERE username=$1`, username).Scan(&userID, &hash)
 	if err != nil {
+		log.Printf("Login failed for user %s: %v", username, err)
 		return "", errors.New("invalid username or password")
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		log.Println("Wrong Password!")
 		return "", errors.New("invalid password")
 	}
 
 	return userID, nil
 
 }
-
 
 func (p *PostgresStore) GetUserByID(ctx context.Context, userID string) (*User, error) {
 	row := p.DB.QueryRow(ctx, `SELECT id, username, last_active, created_at FROM users WHERE id=$1`, userID)
@@ -83,5 +88,5 @@ func (p *PostgresStore) UpdateLastActive(ctx context.Context, userID string) err
 		WHERE id = $2
 	`, time.Now().UTC(), userID)
 
-	return err 
+	return err
 }

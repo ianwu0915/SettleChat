@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/ianwu0915/SettleChat/internal/chat"
 	"github.com/ianwu0915/SettleChat/internal/storage"
-	
 )
 
 var upgrader = websocket.Upgrader{

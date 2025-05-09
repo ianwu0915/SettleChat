@@ -17,13 +17,13 @@ func NewRoomHandler(store *storage.PostgresStore) *RoomHandler {
 }
 
 type createRoomRequest struct {
-	RoomName    string `json:"room_name"`
-	UserID  string `json:"user_id"`
+	RoomName string `json:"room_name"`
+	UserID   string `json:"user_id"`
 }
 
 type joinRoomRequest struct {
-	RoomID  string `json:"room_id"`
-	UserID  string `json:"user_id"`
+	RoomID string `json:"room_id"`
+	UserID string `json:"user_id"`
 }
 
 func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {

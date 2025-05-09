@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/ianwu0915/SettleChat/internal/storage"
@@ -22,7 +23,7 @@ type authRequest struct {
 }
 
 type authResponse struct {
-	UserID string `json:"user_id"`
+	UserID  string `json:"user_id"`
 	Message string `json:"message,omitempty"`
 }
 
@@ -35,8 +36,9 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := h.DB.Register(context.Background(), req.Username, req.Password)
 	if err != nil {
+		log.Print("Regist Failed")
 		http.Error(w, err.Error(), http.StatusBadRequest)
-		return 
+		return
 	}
 	json.NewEncoder(w).Encode(authResponse{UserID: userID})
 }
@@ -67,9 +69,8 @@ func (h *AuthHandler) GetUserByID(w http.ResponseWriter, r *http.Request) {
 	user, err := h.DB.GetUserByID(context.Background(), userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return	
+		return
 	}
 
 	json.NewEncoder(w).Encode(user)
 }
-

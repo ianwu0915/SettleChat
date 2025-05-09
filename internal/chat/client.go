@@ -91,7 +91,6 @@ func (c *Client) ReadPump() {
 		}
 
 		log.Printf("[%s] %s: %s ", c.ID, c.Username, msg.Content)
-		
 
 		// if err := c.Conn.ReadJSON(&msg); err != nil {
 		// 	if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -101,7 +100,7 @@ func (c *Client) ReadPump() {
 		// 	}
 		// 	break
 		// }
-		
+
 		// 補上其他field
 		msg.RoomID = c.RoomID
 		msg.SenderID = c.ID

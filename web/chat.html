@@ -1,110 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SettleChat</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Inter', sans-serif;
       margin: 0;
-      padding: 0;
       display: flex;
       flex-direction: column;
       height: 100vh;
+      background: #121212;
+      color: #e0e0e0;
     }
-    #joinForm, #chatContainer {
-      padding: 20px;
+    
+    header {
+      padding: 16px;
+      background: #6366f1;
+      color: white;
+      text-align: center;
+      font-size: 18px;
+      font-weight: 600;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     }
-    #chatContainer {
-      display: none;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-    }
+    
     #messages {
       flex: 1;
       overflow-y: auto;
-      border: 1px solid #ccc;
-      padding: 10px;
-      margin-bottom: 10px;
-    }
-    .message {
-      margin: 5px 0;
-    }
-    .me {
-      text-align: right;
-      color: blue;
-    }
-    .other {
-      text-align: left;
-      color: green;
-    }
-    #inputBox {
+      padding: 16px;
       display: flex;
+      flex-direction: column;
     }
-    #inputBox input {
+    
+    .message-container {
+      display: flex;
+      width: 100%;
+      margin-bottom: 12px;
+    }
+    
+    .self-container {
+      justify-content: flex-end;
+    }
+    
+    .msg {
+      padding: 12px 16px;
+      border-radius: 18px;
+      max-width: 70%;
+      word-wrap: break-word;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      display: inline-block;
+      font-size: 16px;
+    }
+    
+    .received {
+      background: #2a2a2a;
+      color: #e0e0e0;
+      border-bottom-left-radius: 4px;
+    }
+    
+    .self {
+      background: #4f46e5;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    
+    .sender-name {
+      font-size: 14px;
+      margin-bottom: 4px;
+      opacity: 0.7;
+      font-weight: 600;
+    }
+    
+    footer {
+      padding: 16px;
+      display: flex;
+      border-top: 1px solid #333;
+      background: #1a1a1a;
+    }
+    
+    input {
       flex: 1;
-      padding: 10px;
+      padding: 12px;
+      border: 1px solid #333;
+      border-radius: 24px;
+      background: #2a2a2a;
+      color: #e0e0e0;
+      font-size: 15px;
     }
-    #inputBox button {
-      padding: 10px;
+    
+    input::placeholder {
+      color: #888;
+    }
+    
+    button {
+      margin-left: 10px;
+      padding: 12px 20px;
+      background: #4f46e5;
+      color: white;
+      border: none;
+      border-radius: 24px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #6366f1;
+    }
+    
+    /* Custom scrollbar */
+    #messages::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    #messages::-webkit-scrollbar-track {
+      background: #1a1a1a;
+    }
+    
+    #messages::-webkit-scrollbar-thumb {
+      background: #444;
+      border-radius: 10px;
+    }
+    
+    #messages::-webkit-scrollbar-thumb:hover {
+      background: #555;
     }
   </style>
 </head>
 <body>
-  <div id="joinForm">
-    <h2>SettleChat</h2>
-    <input id="username" placeholder="Enter your name" />
-    <input id="room" placeholder="Room name" />
-    <button onclick="joinChat()">Join</button>
-  </div>
-
-  <div id="chatContainer">
-    <h3 id="roomHeader"></h3>
-    <div id="messages"></div>
-    <div id="inputBox">
-      <input id="msgInput" placeholder="Type a message" />
-      <button onclick="sendMessage()">Send</button>
-    </div>
-  </div>
-
+  <header>SettleChat</header>
+  <div id="messages"></div>
+  <footer>
+    <input id="input" placeholder="Type your message..." />
+    <button onclick="sendMessage()">Send</button>
+  </footer>
+  
   <script>
-    let socket;
-    let username = "";
-    let userID = Date.now().toString(); // simple unique ID
-
-    function joinChat() {
-      username = document.getElementById('username').value.trim();
-      const room = document.getElementById('room').value.trim();
-      if (!username || !room) {
-        alert("Please enter username and room name");
-        return;
+    const params = new URLSearchParams(window.location.search);
+    const roomID = params.get("room_id");
+    const userID = localStorage.getItem("user_id");
+    const username = localStorage.getItem("username") || "Anonymous";
+    if (!userID || !roomID) window.location.href = "/login.html";
+    
+    const ws = new WebSocket(`${location.origin.replace("http", "ws")}/ws?room=${roomID}&user_id=${userID}&username=${username}`);
+    
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("input");
+    
+    // Handle Enter key press
+    input.addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        sendMessage();
       }
-      document.getElementById('joinForm').style.display = 'none';
-      document.getElementById('chatContainer').style.display = 'flex';
-      document.getElementById('roomHeader').innerText = `Room: ${room}`;
-
-      socket = new WebSocket(`ws://localhost:8080/ws?room=${room}&user_id=${userID}&username=${username}`);
-
-      socket.onmessage = (event) => {
-        const msg = JSON.parse(event.data);
-        const isMe = msg.sender_id === userID;
-        const el = document.createElement("div");
-        el.className = `message ${isMe ? 'me' : 'other'}`;
-        el.textContent = `[${msg.sender}] ${msg.content}`;
-        document.getElementById("messages").appendChild(el);
-        document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
-      };
-    }
-
+    });
+    
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      const isSelf = msg.sender_id === userID;
+      
+      const container = document.createElement("div");
+      container.className = "message-container" + (isSelf ? " self-container" : "");
+      
+      const bubble = document.createElement("div");
+      bubble.className = "msg " + (isSelf ? "self" : "received");
+      
+      const senderElement = document.createElement("div");
+      senderElement.className = "sender-name";
+      senderElement.textContent = isSelf ? "You" : msg.sender;
+      
+      const messageContent = document.createElement("div");
+      messageContent.textContent = msg.content;
+      
+      bubble.appendChild(senderElement);
+      bubble.appendChild(messageContent);
+      container.appendChild(bubble);
+      messages.appendChild(container);
+      
+      // Scroll to bottom
+      messages.scrollTop = messages.scrollHeight;
+    };
+    
     function sendMessage() {
-      const input = document.getElementById("msgInput");
-      const msg = input.value.trim();
-      if (msg && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ content: msg }));
-        input.value = "";
-      }
+      const text = input.value.trim();
+      if (!text) return;
+      ws.send(JSON.stringify({ content: text }));
+      input.value = "";
     }
   </script>
 </body>

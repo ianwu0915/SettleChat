@@ -25,7 +25,6 @@ func main() {
 		log.Fatalf("Failed to connect to Postgres: %v", err)
 	}
 
-
 	// Creat a hub
 	hub := chat.NewHub(store)
 	go hub.Run()
@@ -36,12 +35,14 @@ func main() {
 	mux := http.NewServeMux()
 	// Register WsHandler
 	mux.HandleFunc("/ws", ws.WebsocketHandler(hub))
-	mux.Handle("POST /register", http.HandlerFunc(authHandler.Register))
-	mux.Handle("POST /login", http.HandlerFunc(authHandler.Login))
-	mux.Handle("GET /user", http.HandlerFunc(authHandler.GetUserByID))
-	mux.Handle("POST /rooms/create", http.HandlerFunc(roomHandler.CreateRoom))
-	mux.Handle("POST /rooms/join", http.HandlerFunc(roomHandler.JoinRoom))
-	mux.Handle("GET /rooms", http.HandlerFunc(roomHandler.GetUserRooms))
+	mux.Handle("/register", http.HandlerFunc(authHandler.Register))
+	mux.Handle("/login", http.HandlerFunc(authHandler.Login))
+	mux.Handle("/user", http.HandlerFunc(authHandler.GetUserByID))
+	mux.Handle("/rooms/create", http.HandlerFunc(roomHandler.CreateRoom))
+	mux.Handle("/rooms/join", http.HandlerFunc(roomHandler.JoinRoom))
+	mux.Handle("/rooms", http.HandlerFunc(roomHandler.GetUserRooms))
+	mux.Handle("/", http.FileServer(http.Dir("./web")))
+
 
 	// Acticate the Sercer
 	addr := ":8080"

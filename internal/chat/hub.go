@@ -5,6 +5,7 @@ import (
 	"log"
 	"sync"
 	"time"
+
 	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
@@ -21,7 +22,7 @@ func NewHub(store *storage.PostgresStore) *Hub {
 		Rooms:      make(map[string]*Room),
 		Register:   make(chan *Client),
 		UnRegister: make(chan *Client),
-		Store: store,
+		Store:      store,
 	}
 }
 

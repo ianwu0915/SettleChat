@@ -2,6 +2,7 @@ package chat
 
 import (
 	"log"
+
 	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 

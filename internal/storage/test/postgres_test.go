@@ -48,10 +48,10 @@ func TestSaveAndQueryMessages(t *testing.T) {
 	now := time.Now().UTC()
 
 	msg := storage.ChatMessage{
-		RoomID: roomID,
-		SenderID: "test_user_1",
-		Sender: "TestUser",
-		Content: "Hello from test!", 
+		RoomID:    roomID,
+		SenderID:  "test_user_1",
+		Sender:    "TestUser",
+		Content:   "Hello from test!",
 		Timestamp: now,
 	}
 
@@ -73,7 +73,7 @@ func TestSaveAndQueryMessages(t *testing.T) {
 	for _, m := range msgs {
 		fmt.Printf("cmp: content(%q == %q) → %v\n", m.Content, msg.Content, m.Content == msg.Content)
 		fmt.Printf("cmp: sender_id(%q == %q) → %v\n", m.SenderID, msg.SenderID, m.SenderID == msg.SenderID)
-		
+
 		if m.Content == msg.Content && m.SenderID == msg.SenderID {
 			found = true
 			assertCorrectMessage(t, m.RoomID, msg.RoomID)
