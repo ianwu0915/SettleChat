@@ -1,5 +1,6 @@
 
 ### Module 
+````
 settlechat/
 │
 ├── cmd/
@@ -20,7 +21,10 @@ settlechat/
 ├── go.mod
 ├── go.sum
 └── README.md
+````
 
+## 紀錄
+- 5/8 Implemented database layer + basic chat 
 
 ## What is in mind when scale up
 
@@ -32,3 +36,8 @@ settlechat/
 6. Persistent Client connection with Server using Zookeeper and Load-balancer
 7. 存新傳的message到資料庫之前，先傳到群組 ，透過flink or Kafka Streaming 
 8. Change Current Design Using a single websocket connection for each server
+
+### Setup-NATS Server
+````bash
+docker run -d --name nats-server -p 4222:4222 nats:latest
+````
