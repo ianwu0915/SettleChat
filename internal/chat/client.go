@@ -1,7 +1,6 @@
 package chat
 
 import (
-	"context"
 	"log"
 	"time"
 
@@ -106,13 +105,20 @@ func (c *Client) ReadPump() {
 		msg.SenderID = c.ID
 		msg.Sender = c.Username
 		msg.Timestamp = time.Now()
+		
 
-		if err := c.Hub.Store.SaveMessage(context.Background(), msg); err != nil {
-			log.Printf("❌ failed to save message to DB: %v", err)
+		// !! 改成Publisher 發佈消息到NATS 而不是直接存到數據庫
+		if err := c.Hub.Publisher.PublishChatMessage(msg); err != nil {
+			log.Printf("Failed to publish message: %v", err)
+			continue
 		}
 
-		room := c.Hub.getOrCreateRoom(c.RoomID)
-		room.Broadcast <- msg
+		// if err := c.Hub.Store.SaveMessage(context.Background(), msg); err != nil {
+		// 	log.Printf("❌ failed to save message to DB: %v", err)
+		// }
+
+		// room := c.Hub.getOrCreateRoom(c.RoomID)
+		// room.Broadcast <- msg
 
 	}
 }

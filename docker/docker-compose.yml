@@ -14,5 +14,26 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  nats:
+    image: nats:latest
+    container_name: settlechat-nats
+    restart: always
+    ports:
+      - "4222:4222"  # 客戶端連接端口
+      - "8222:8222"  # HTTP監控接口
+    command: "--jetstream"  # 啟用JetStream (可選)
+    volumes:
+      - nats-data:/data
+
+  redis:
+    image: redis:alpine
+    container_name: settlechat-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+      
 volumes:
   pgdata:

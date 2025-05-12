@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/nats-io/nats.go"
@@ -101,10 +102,18 @@ func (s *Subscriber) SubscribeForStorage() error {
 			log.Printf("Error Unmarshalling message for storege: %v", err)
 			return 
 		}
+
+		if chatMsg.SenderID == "system" || chatMsg.Content == "" {
+			return 
+		}
 		
 		// Save the message to the database
 		go func(msg storage.ChatMessage) {
-			if err := s.store.SaveMessage(context.Background(), msg); err != nil {
+			// Handle timeout
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if err := s.store.SaveMessage(ctx, msg); err != nil {
 				log.Printf("failed to save message to DB: %v", err)
 				// Maybe Retry?
 			}
