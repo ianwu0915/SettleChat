@@ -1,14 +1,12 @@
 package chat
 
 import (
-	"context"
 	"log"
 	"sync"
-	"time"
 
-	"github.com/ianwu0915/SettleChat/internal/events"
 	"github.com/ianwu0915/SettleChat/internal/messaging"
 	"github.com/ianwu0915/SettleChat/internal/storage"
+	"github.com/ianwu0915/SettleChat/internal/types"
 )
 
 type Hub struct {
@@ -16,13 +14,13 @@ type Hub struct {
 	Register   chan *Client
 	UnRegister chan *Client
 	Store      *storage.PostgresStore
-	Publisher  *messaging.Publisher
+	Publisher  *messaging.NATSPublisher
 	Subscriber *messaging.Subscriber
-	eventBus   events.EventBus
+	Topics     types.TopicFormatter
 	mu         sync.Mutex
 }
 
-func NewHub(store *storage.PostgresStore, publisher *messaging.Publisher, subscriber *messaging.Subscriber) *Hub {
+func NewHub(store *storage.PostgresStore, publisher *messaging.NATSPublisher, subscriber *messaging.Subscriber, topics types.TopicFormatter) *Hub {
 	hub := &Hub{
 		Rooms:      make(map[string]*Room),
 		Register:   make(chan *Client),
@@ -30,20 +28,10 @@ func NewHub(store *storage.PostgresStore, publisher *messaging.Publisher, subscr
 		Store:      store,
 		Publisher:  publisher,
 		Subscriber: subscriber,
-		eventBus:   events.NewEventBus(),
+		Topics:     topics,
 	}
 
-	hub.setupEventHandlers()
 	return hub
-}
-
-func (h *Hub) setupEventHandlers() {
-	h.eventBus.Subscribe(events.UserJoinedEvent, &userJoinedHandler{store: h.Store})
-	h.eventBus.Subscribe(events.UserLeftEvent, &userLeftHandler{})
-	h.eventBus.Subscribe(events.MessageSentEvent, &messageSentHandler{store: h.Store})
-	h.eventBus.Subscribe(events.SystemMessageEvent, &systemMessageHandler{})
-	h.eventBus.Subscribe(events.PresenceEvent, &presenceHandler{publisher: h.Publisher})
-	h.eventBus.Subscribe(events.HistoryMessageEvent, &historyMessageHandler{hub: h})
 }
 
 func (h *Hub) getOrCreateRoom(id string) *Room {
@@ -52,9 +40,13 @@ func (h *Hub) getOrCreateRoom(id string) *Room {
 
 	room, exist := h.Rooms[id]
 	if !exist {
-		room = NewRoom(id, h.Publisher, h.eventBus)
+		log.Printf("Creating new room: %s", id)
+		room = NewRoom(id, h.Publisher, h.Subscriber)
 		h.Rooms[id] = room
 		go room.Run(h.Subscriber)
+		log.Printf("Room %s created and started", id)
+	} else {
+		log.Printf("Found existing room: %s", id)
 	}
 
 	return room
@@ -67,24 +59,6 @@ func (h *Hub) Run() {
 			room := h.getOrCreateRoom(client.RoomID)
 			room.AddClient(client)
 
-			// 獲取歷史消息並發布事件
-			msgs, err := h.Store.GetRecentMessages(context.Background(), client.RoomID, 50)
-			if err != nil {
-				log.Printf("Error Retrieving Past Message from databases: %v", err)
-				continue
-			}
-
-			event := events.NewEvent(events.HistoryMessageEvent, events.HistoryMessagePayload{
-				RoomID:   client.RoomID,
-				UserID:   client.ID,
-				Username: client.Username,
-				Messages: msgs,
-			})
-
-			if err := h.eventBus.Publish(event); err != nil {
-				log.Printf("Failed to publish history message event: %v", err)
-			}
-
 		case client := <-h.UnRegister:
 			h.mu.Lock()
 			if room, ok := h.Rooms[client.RoomID]; ok {
@@ -95,63 +69,8 @@ func (h *Hub) Run() {
 	}
 }
 
-// 事件處理器實現
-type userJoinedHandler struct {
-	store *storage.PostgresStore
-}
-
-func (h *userJoinedHandler) Handle(event events.Event) error {
-	payload := event.Payload().(events.UserJoinedPayload)
-	log.Printf("User %s joined room %s", payload.Username, payload.RoomID)
-	return nil
-}
-
-type userLeftHandler struct{}
-
-func (h *userLeftHandler) Handle(event events.Event) error {
-	payload := event.Payload().(events.UserLeftPayload)
-	log.Printf("User %s left room %s", payload.Username, payload.RoomID)
-	return nil
-}
-
-type messageSentHandler struct {
-	store *storage.PostgresStore
-}
-
-func (h *messageSentHandler) Handle(event events.Event) error {
-	payload := event.Payload().(events.MessageSentPayload)
-	ctx := context.Background()
-	if err := h.store.SaveMessage(ctx, payload.Message); err != nil {
-		log.Printf("Failed to save message to database: %v", err)
-		return err
-	}
-	return nil
-}
-
-type systemMessageHandler struct{}
-
-func (h *systemMessageHandler) Handle(event events.Event) error {
-	payload := event.Payload().(events.SystemMessagePayload)
-	log.Printf("System message in room %s: %s", payload.RoomID, payload.Message)
-	return nil
-}
-
-type presenceHandler struct {
-	publisher *messaging.Publisher
-}
-
-func (h *presenceHandler) Handle(event events.Event) error {
-	payload := event.Payload().(events.PresencePayload)
-	return h.publisher.PublishUserPresence(
-		payload.RoomID,
-		payload.UserID,
-		payload.Username,
-		payload.IsOnline,
-	)
-}
-
-// findClient 在指定房間中查找客戶端
-func (h *Hub) findClient(roomID, userID string) (*Client, bool) {
+// FindClient 在指定房間中查找客戶端
+func (h *Hub) FindClient(roomID, userID string) (*Client, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -160,39 +79,33 @@ func (h *Hub) findClient(roomID, userID string) (*Client, bool) {
 		return nil, false
 	}
 
-	room.mu.Lock()
-	defer room.mu.Unlock()
+	room.Mu.Lock()
+	defer room.Mu.Unlock()
 
 	client, exists := room.Clients[userID]
 	return client, exists
 }
 
-type historyMessageHandler struct {
-	hub *Hub
-}
+// Close gracefully shuts down the hub and all client connections
+func (h *Hub) Close() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
-func (h *historyMessageHandler) Handle(event events.Event) error {
-	payload := event.Payload().(events.HistoryMessagePayload)
-	client, ok := h.hub.findClient(payload.RoomID, payload.UserID)
-	if !ok {
-		log.Printf("Client %s no longer in room %s", payload.Username, payload.RoomID)
-		return nil
-	}
-
-	for i := len(payload.Messages) - 1; i >= 0; i-- {
-		msg := payload.Messages[i]
-		select {
-		case client.Send <- msg:
-			log.Printf("Successfully sent history message to %s", payload.Username)
-		case <-time.After(2 * time.Second):
-			log.Printf("⚠️ timed out sending history to %s", payload.Username)
-			return nil
-		default:
-			log.Printf("Cannot send history to client %s, channel might be closed", payload.Username)
-			return nil
+	for _, room := range h.Rooms {
+		room.Mu.Lock()
+		for _, client := range room.Clients {
+			close(client.Send)
+			client.Conn.Close()
 		}
+		room.Mu.Unlock()
 	}
-	return nil
+	h.Rooms = make(map[string]*Room)
 }
 
+// GetRoom 獲取指定ID的房間
+func (h *Hub) GetRoom(id string) *Room {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
+	return h.Rooms[id]
+}

@@ -28,14 +28,6 @@ type Room struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-type PresenceMessage struct {
-	RoomID   string `json:"room_id"`
-	UserID   string `json:"user_id"`
-	Username string `json:"username"`
-	IsOnline bool   `json:"is_online"`
-}
-
-
 // Leverage the Go interface for better decoupling, unit-testing
 type MessageStore interface {
 	SaveMessage(ctx context.Context, msg ChatMessage) error

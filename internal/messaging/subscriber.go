@@ -1,174 +1,229 @@
 package messaging
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"log"
-	"time"
+	"strings"
 
 	"github.com/ianwu0915/SettleChat/internal/storage"
+	"github.com/ianwu0915/SettleChat/internal/types"
 	"github.com/nats-io/nats.go"
 )
 
-// 接口
-// MessageHandler 定義處理接收消息的函數類型
-// 實現者需要處理如何將消息轉發給客戶端或進行其他處理
-// 例如：Room可以實現一個handler將消息發送給所有連接的客戶端
-type MessageHandler func (msg storage.ChatMessage) error 
-
-// PresenceHandler 定義處理用戶狀態變化的函數類型
-// 實現者需要處理用戶上線/下線事件，例如更新在線用戶列表
-// 或者向房間內的其他用戶通知狀態變化
-type PresenceHandler func (roomID, userID, username string, isOnline bool) error 
-
-
+// Subscriber 管理 NATS 訂閱
 type Subscriber struct {
 	natsManager *NATSManager
-	store *storage.PostgresStore
-	subs []*nats.Subscription
+	store       *storage.PostgresStore
+	subs        []*nats.Subscription
+	env         string
+	handlers    map[string]types.MessageHandler
+	Topics      types.TopicFormatter
 }
 
-func NewSubscriber(natsManager *NATSManager, store *storage.PostgresStore) *Subscriber {
-	return &Subscriber{
+func NewSubscriber(natsManager *NATSManager, store *storage.PostgresStore, env string, topics types.TopicFormatter) *Subscriber {
+	log.Printf("Creating new subscriber for environment: %s", env)
+	s := &Subscriber{
 		natsManager: natsManager,
-		store: store,
-		subs: make([]*nats.Subscription, 0),
+		store:       store,
+		subs:        make([]*nats.Subscription, 0),
+		env:         env,
+		handlers:    make(map[string]types.MessageHandler),
+		Topics:      topics,
 	}
+	log.Printf("Subscriber created successfully with env: %s", env)
+	return s
 }
 
-// Subscribe to a Single Room given a roomID
-func (s *Subscriber) SubscribeToRoom(roomID string, handler MessageHandler) error {
+// RegisterHandler 註冊消息處理器
+func (s *Subscriber) RegisterHandler(category, action string, handler types.MessageHandler) {
+	handlerKey := category + "." + action
+	log.Printf("Registering handler for %s", handlerKey)
+	s.handlers[handlerKey] = handler
+	log.Printf("Handler registered successfully for %s", handlerKey)
+}
 
-	if roomID == "" {
-		return fmt.Errorf("room ID cannot be empty")
+// SubscribeToRoom 訂閱特定房間的所有相關主題
+func (s *Subscriber) SubscribeToRoom(roomID string) error {
+	log.Printf("Starting subscription process for room: %s", roomID)
+
+	// 訂閱用戶加入相關事件
+	userJoinedTopic := s.Topics.GetUserJoinedTopic(roomID)
+	log.Printf("Subscribing to user joined topic: %s", userJoinedTopic)
+	if err := s.SubscribeTopic(userJoinedTopic); err != nil {
+		log.Printf("Failed to subscribe to user joined topic: %v", err)
+		return err
 	}
 
-	subject := fmt.Sprintf("chat.room.%s", roomID)
+	// 訂閱用戶離開相關事件
+	userLeftTopic := s.Topics.GetUserLeftTopic(roomID)
+	log.Printf("Subscribing to user left topic: %s", userLeftTopic)
+	if err := s.SubscribeTopic(userLeftTopic); err != nil {
+		log.Printf("Failed to subscribe to user left topic: %v", err)
+		return err
+	}
 
-	sub, err := s.natsManager.Subscribe(subject, func(msg *nats.Msg) {
-		var chatMsg storage.ChatMessage
-		if err := json.Unmarshal(msg.Data, &chatMsg); err != nil {
-			log.Printf("Error unmarshaling message: %v", err)
+	// 訂閱訊息相關事件
+	messageTopic := s.Topics.GetMessageTopic(roomID)
+	log.Printf("Subscribing to message topic: %s", messageTopic)
+	if err := s.SubscribeTopic(messageTopic); err != nil {
+		log.Printf("Failed to subscribe to message topic: %v", err)
+		return err
+	}
+
+	// 訂閱廣播消息事件
+	broadcastTopic := s.Topics.GetBroadcastTopic(roomID)
+	log.Printf("Subscribing to broadcast topic: %s", broadcastTopic)
+	if err := s.SubscribeTopic(broadcastTopic); err != nil {
+		log.Printf("Failed to subscribe to broadcast topic: %v", err)
+		return err
+	}
+
+	// 訂閱系統消息事件
+	systemTopic := s.Topics.GetSystemMessageTopic(roomID)
+	log.Printf("Subscribing to system topic: %s", systemTopic)
+	if err := s.SubscribeTopic(systemTopic); err != nil {
+		log.Printf("Failed to subscribe to system topic: %v", err)
+		return err
+	}
+
+	// 訂閱用戶上線狀態事件
+	userPresenceTopic := s.Topics.GetPresenceTopic(roomID)
+	log.Printf("Subscribing to presence topic: %s", userPresenceTopic)
+	if err := s.SubscribeTopic(userPresenceTopic); err != nil {
+		log.Printf("Failed to subscribe to presence topic: %v", err)
+		return err
+	}
+
+	// 訂閱聊天室歷史訊息
+	historyMessageRequestTopic := s.Topics.GetHistoryRequestTopic(roomID)
+	log.Printf("Subscribing to history message topic: %s", historyMessageRequestTopic)
+	if err := s.SubscribeTopic(historyMessageRequestTopic); err != nil {
+		log.Printf("Failed to subscribe to presence topic: %v", err)
+		return err
+	}
+
+
+	// historyMessageResponseTopic := s.Topics.GetHistoryResponseTopic(roomID, clientId )
+	// log.Printf("Subscribing to history message topic: %s", historyMessageResponseTopic)
+	// if err := s.subscribeTopic(historyMessageRequestTopic); err != nil {
+	// 	log.Printf("Failed to subscribe to presence topic: %v", err)
+	// 	return err
+	// }
+
+
+	log.Printf("Successfully subscribed to all topics for room: %s", roomID)
+	return nil
+}
+
+// SubscribeTopic 訂閱特定主題
+func (s *Subscriber) SubscribeTopic(topic string) error {
+	log.Printf("Attempting to subscribe to topic: %s", topic)
+	
+	sub, err := s.natsManager.Subscribe(topic, func(msg *nats.Msg) {
+		log.Printf("Received message on topic: %s", msg.Subject)
+		
+		// 從主題中提取類別和動作
+		parts := parseTopic(msg.Subject)
+		if len(parts) < 4 {
+			log.Printf("Error: Invalid topic format: %s (expected at least 4 parts)", msg.Subject)
 			return
 		}
 
-		if err := handler(chatMsg); err != nil {
-			log.Printf("Error handling Message: %v", err)
-		}
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to room %s: %w", roomID, err)
-	}
-
-	s.subs = append(s.subs, sub)
-	log.Printf("Subscribed to room: %s", roomID)
-	return nil
-}
-
-// SubscribeToAllRooms 訂閱所有房間的消息
-func (s *Subscriber) SubscribeToAllRooms(handler MessageHandler) error {
-	subject := "chat.room.*"
-	
-	sub, err := s.natsManager.Subscribe(subject, func(msg *nats.Msg) {
-		var chatMsg storage.ChatMessage
-		if err := json.Unmarshal(msg.Data, &chatMsg); err != nil {
-			log.Printf("Error unmarshaling message: %v", err)
+		handlerKey := parts[1] + "." + parts[2]
+		log.Printf("Looking for handler with key: %s", handlerKey)
+		
+		handler, exists := s.handlers[handlerKey]
+		if !exists {
+			log.Printf("Error: No handler found for topic: %s (key: %s)", msg.Subject, handlerKey)
 			return
 		}
-		
-		if err := handler(chatMsg); err != nil {
-			log.Printf("Error handling message: %v", err)
+
+		log.Printf("Processing message with handler for key: %s", handlerKey)
+		if err := handler.Handle(msg); err != nil {
+			log.Printf("Error: Failed to handle message for topic %s: %v", msg.Subject, err)
+		} else {
+			log.Printf("Successfully processed message for topic: %s", msg.Subject)
 		}
 	})
-	
+
 	if err != nil {
-		return fmt.Errorf("failed to subscribe to all rooms: %w", err)
+		log.Printf("Error: Failed to subscribe to topic %s: %v", topic, err)
+		return fmt.Errorf("failed to subscribe to topic %s: %w", topic, err)
 	}
-	
+
 	s.subs = append(s.subs, sub)
-	log.Printf("Subscribed to all rooms")
+	log.Printf("Successfully subscribed to topic: %s", topic)
 	return nil
 }
 
-// SubscribeForStorage: used for saving messages into database
-func (s *Subscriber) SubscribeForStorage() error {
-	subject := "chat.room.*"
-
-	sub, err := s.natsManager.Subscribe(subject, func(msg *nats.Msg) {
-		var chatMsg storage.ChatMessage
-		if err := json.Unmarshal(msg.Data, &chatMsg); err != nil {
-			log.Printf("Error Unmarshalling message for storege: %v", err)
-			return 
+// parseTopic 解析主題字符串
+func parseTopic(topic string) []string {
+	parts := strings.Split(topic, ".")
+	log.Printf("Parsed topic %s into %d parts", topic, len(parts))
+	
+	// 如果是歷史消息相關主題，需要特殊處理
+	if len(parts) >= 4 && parts[1] == "message" {
+		if parts[2] == "history" && parts[3] == "request" {
+			// 將 history.request 作為一個完整的 action
+			newParts := make([]string, 0)
+			newParts = append(newParts, parts[0])  // settlechat
+			newParts = append(newParts, parts[1])  // message
+			newParts = append(newParts, "history.request") // 完整的 action
+			newParts = append(newParts, parts[4:]...) // roomID 等其他部分
+			log.Printf("Reformatted history request topic parts: %v", newParts)
+			return newParts
+		} else if parts[2] == "history" && parts[3] == "response" {
+			// 將 history.response 作為一個完整的 action
+			newParts := make([]string, 0)
+			newParts = append(newParts, parts[0])  // settlechat
+			newParts = append(newParts, parts[1])  // message
+			newParts = append(newParts, "history.response") // 完整的 action
+			newParts = append(newParts, parts[4:]...) // roomID 和 userID
+			log.Printf("Reformatted history response topic parts: %v", newParts)
+			return newParts
 		}
-
-		if chatMsg.SenderID == "system" || chatMsg.Content == "" {
-			return 
-		}
-		
-		// Save the message to the database
-		go func(msg storage.ChatMessage) {
-			// Handle timeout
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-
-			if err := s.store.SaveMessage(ctx, msg); err != nil {
-				log.Printf("failed to save message to DB: %v", err)
-				// Maybe Retry?
-			}
-		}(chatMsg)
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to create storage subscriber: %w", err)
 	}
 	
-	s.subs = append(s.subs, sub)
-	log.Printf("Started message storage subscriber")
-	return nil
-
-}
-
-// SubscribeToPresence 訂閱用戶在線狀態變化
-func (s *Subscriber) SubscribeToPresence(roomID string, handler PresenceHandler) error {
-	subject := fmt.Sprintf("chat.presence.%s", roomID)
-	
-	sub, err := s.natsManager.Subscribe(subject, func(msg *nats.Msg) {
-		var presenceMsg storage.PresenceMessage
-		
-		if err := json.Unmarshal(msg.Data, &presenceMsg); err != nil {
-			log.Printf("Error unmarshaling presence message: %v", err)
-			return
-		}
-		
-		if err := handler(presenceMsg.RoomID, presenceMsg.UserID, presenceMsg.Username, presenceMsg.IsOnline); err != nil {
-			log.Printf("Error handling presence message: %v", err)
-		}
-	})
-	
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to presence for room %s: %w", roomID, err)
-	}
-	
-	s.subs = append(s.subs, sub)
-	log.Printf("Subscribed to presence updates for room: %s", roomID)
-	return nil
+	return parts
 }
 
 // Unsubscribe 取消所有訂閱
 func (s *Subscriber) Unsubscribe() {
-	for _, sub := range s.subs {
+	log.Printf("Starting unsubscribe process for %d subscriptions", len(s.subs))
+	for i, sub := range s.subs {
 		if err := sub.Unsubscribe(); err != nil {
-			log.Printf("Error unsubscribing: %v", err)
+			log.Printf("Error unsubscribing from subscription %d: %v", i+1, err)
+		} else {
+			log.Printf("Successfully unsubscribed from subscription %d", i+1)
 		}
 	}
 	s.subs = nil
-	log.Println("Unsubscribed from all subscriptions")
+	log.Println("Completed unsubscribe process for all subscriptions")
 }
 
 // Close 清理訂閱並關閉資源
 func (s *Subscriber) Close() error {
+	log.Println("Closing subscriber and cleaning up resources")
 	s.Unsubscribe()
+	log.Println("Subscriber closed successfully")
 	return nil
+}
+
+// UnsubscribeTopic 取消訂閱特定主題
+func (s *Subscriber) UnsubscribeTopic(topic string) error {
+	log.Printf("Attempting to unsubscribe from topic: %s", topic)
+	for i, sub := range s.subs {
+		if sub.Subject == topic {
+			if err := sub.Unsubscribe(); err != nil {
+				log.Printf("Error unsubscribing from topic %s: %v", topic, err)
+				return err
+			}
+			// 移除已取消訂閱的主題
+			s.subs = append(s.subs[:i], s.subs[i+1:]...)
+			log.Printf("Successfully unsubscribed from topic: %s", topic)
+			return nil
+		}
+	}
+	log.Printf("No subscription found for topic: %s", topic)
+	return fmt.Errorf("no subscription found for topic: %s", topic)
 }

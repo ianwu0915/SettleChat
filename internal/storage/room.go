@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"time"
 
@@ -81,4 +82,29 @@ func (p *PostgresStore) GetUserRooms(ctx context.Context, userID string) ([]Room
 	}
 	log.Printf("Total rooms found: %d", len(rooms))
 	return rooms, nil
+}
+
+// RemoveUserFromRoom 從房間中移除用戶
+func (p *PostgresStore) RemoveUserFromRoom(ctx context.Context, userID, roomID string) error {
+	// 從 user_rooms 表中刪除記錄
+	_, err := p.DB.Exec(ctx, `
+		DELETE FROM user_rooms 
+		WHERE user_id = $1 AND room_id = $2
+	`, userID, roomID)
+	if err != nil {
+		return fmt.Errorf("failed to remove user from room: %w", err)
+	}
+
+	// 更新用戶在線狀態為離線
+	_, err = p.DB.Exec(ctx, `
+		UPDATE user_presence 
+		SET is_online = false, last_seen = NOW()
+		WHERE user_id = $1 AND room_id = $2
+	`, userID, roomID)
+	if err != nil {
+		log.Printf("Failed to update user presence on room leave: %v", err)
+		// 不返回錯誤，因為這是次要操作
+	}
+
+	return nil
 }

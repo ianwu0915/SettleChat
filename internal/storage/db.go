@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"time"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -75,7 +76,23 @@ func (p *PostgresStore) migrate(ctx context.Context) error {
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_rooms_members_room_id ON room_members (room_id);
+
+	CREATE TABLE IF NOT EXISTS user_presence (
+    room_id VARCHAR(36) NOT NULL,
+    user_id VARCHAR(36) NOT NULL,
+    is_online BOOLEAN NOT NULL,
+    last_seen TIMESTAMP NOT NULL,
+    PRIMARY KEY (room_id, user_id)
+	);
+
 	`)
 
 	return err
+}
+
+// Close closes the database connection pool
+func (p *PostgresStore) Close() {
+	if p.DB != nil {
+		p.DB.Close()
+	}
 }

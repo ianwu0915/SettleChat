@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/ianwu0915/SettleChat/internal/types"
 	"github.com/ianwu0915/SettleChat/internal/storage"
+
 )
 
 // Define Client Struct
@@ -96,7 +98,7 @@ func (c *Client) ReadPump() {
 	})
 
 	for {
-		var msg storage.ChatMessage
+		var msg types.ChatMessage
 		log.Println("waiting for message...")
 
 		// Read Message from WebSocket
@@ -129,7 +131,7 @@ func (c *Client) ReadPump() {
 		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 
 		// !! 改成Publisher 發佈消息到NATS 而不是直接存到數據庫
-		if err := c.Hub.Publisher.PublishChatMessage(msg); err != nil {
+		if err := c.Hub.Publisher.PublishMessage(msg); err != nil {
 			log.Printf("Failed to publish message: %v", err)
 			continue
 		}

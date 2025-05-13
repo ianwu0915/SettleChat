@@ -13,12 +13,19 @@ func (p *PostgresStore) SaveMessage(ctx context.Context, msg ChatMessage) error 
 }
 
 func (p *PostgresStore) GetRecentMessages(ctx context.Context, roomId string, limit int) ([]ChatMessage, error) {
+	// 先用子查詢按時間倒序選擇最近的消息，然後在外層查詢中按時間正序排列
+	// 排除 sender_id = 'system' 的消息
 	rows, err := p.DB.Query(ctx, `
+		WITH recent_messages AS (
+			SELECT id, room_id, sender_id, sender, content, timestamp 
+			FROM messages 
+			WHERE room_id = $1 AND sender_id != 'system'
+			ORDER BY timestamp DESC
+			LIMIT $2
+		)
 		SELECT id, room_id, sender_id, sender, content, timestamp 
-		FROM messages 
-		WHERE room_id = $1
-		ORDER BY timestamp DESC
-		LIMIT $2
+		FROM recent_messages
+		ORDER BY timestamp ASC
 	`, roomId, limit)
 
 	if err != nil {

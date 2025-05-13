@@ -16,7 +16,7 @@ type NATSManager struct {
 	options []nats.Option
 }
 
-func NewNATSManger(url string, reconnect bool) *NATSManager {
+func NewNATSManager(url string, reconnect bool) *NATSManager {
 	if url == "" {
 		url = nats.DefaultURL //nats://localhost:4222
 	}

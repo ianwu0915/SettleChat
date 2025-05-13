@@ -2,90 +2,131 @@ package messaging
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
+	"time"
 
-	"github.com/ianwu0915/SettleChat/internal/storage"
+	"github.com/ianwu0915/SettleChat/internal/types"
 )
 
 // Publish publish message to NATS
-type Publisher struct {
+type NATSPublisher struct {
 	natsManager *NATSManager
+	env         string
+	topics      types.TopicFormatter
 }
 
-func NewPublisher(NATSManager *NATSManager) *Publisher {
-	return &Publisher {
-		natsManager: NATSManager,
+func NewPublisher(natsManager *NATSManager, env string, topics types.TopicFormatter) *NATSPublisher {
+	log.Printf("Creating new publisher for environment: %s", env)
+	p := &NATSPublisher{
+		natsManager: natsManager,
+		env:         env,
+		topics:      topics,
 	}
+	log.Printf("Publisher created successfully with env: %s", env)
+	return p
 }
 
-// Publish Chatmessage to the target room subject
-// subject: chat.room.roomId
-func (p *Publisher) PublishChatMessage(msg storage.ChatMessage) error {
-	if msg.RoomID == "" {
-		return fmt.Errorf("room ID cannot be empty")
+// Publish implements the types.NATSPublisher interface
+func (p *NATSPublisher) Publish(topic string, data []byte) error {
+	return p.natsManager.Publish(topic, data)
+}
+
+// 定義各種可以Publish的事件，帶著對應的payload傳送至NATS
+// PublishUserJoined 發布用戶加入事件
+func (p *NATSPublisher) PublishUserJoined(roomID, userID, username string) error {
+	msg := types.UserJoinedMessage{
+		RoomID:   roomID,
+		UserID:   userID,
+		Username: username,
+		JoinedAt: time.Now(),
 	}
 
-	// Serialize the message (Paylod)
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message: %w", err)
+		return err
 	}
 
-	subject := fmt.Sprintf("chat.room.%s", msg.RoomID)
-
-	err = p.natsManager.Publish(subject, data)
-	if err != nil {
-		return fmt.Errorf("failed to publish message: %w", err)
-	}
-
-	log.Printf("Published message to %s: %s", subject, msg.Content)
-	return nil
-
+	topic := p.topics.GetUserJoinedTopic(roomID)
+	return p.natsManager.Publish(topic, data)
 }
 
-// PublishSystemMessage 發布系統消息到指定房間
-func (p *Publisher) PublishSystemMessage(roomID, content string) error {
-	// 創建系統消息
-	msg := storage.ChatMessage{
+// PublishUserLeft 發布用戶離開事件
+func (p *NATSPublisher) PublishUserLeft(roomID, userID, username string) error {
+	msg := types.UserLeftMessage{
 		RoomID:   roomID,
-		SenderID: "system",
-		Sender:   "System",
-		Content:  content,
+		UserID:   userID,
+		Username: username,
+		LeftAt:   time.Now(),
 	}
 
-	return p.PublishChatMessage(msg)
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	topic := p.topics.GetUserLeftTopic(roomID)
+	return p.natsManager.Publish(topic, data)
 }
 
-// PublishUserPresence 發布用戶在線狀態變更消息
-func (p *Publisher) PublishUserPresence(roomID, userID, username string, isOnline bool) error {
-	// 創建狀態消息
-	presenceMsg := storage.PresenceMessage {
+// PublishMessage 發布聊天消息
+func (p *NATSPublisher) PublishMessage(msg types.ChatMessage) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	topic := p.topics.GetMessageTopic(msg.RoomID)
+	return p.natsManager.Publish(topic, data)
+}
+
+// PublishSystemMessage 發布系統消息
+func (p *NATSPublisher) PublishSystemMessage(roomID, message string) error {
+	msg := types.SystemMessage{
+		RoomID:    roomID,
+		Message:   message,
+		Timestamp: time.Now(),
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+
+	topic := p.topics.GetSystemMessageTopic(roomID)
+	return p.natsManager.Publish(topic, data)
+}
+
+// PublishUserPresence 發布用戶在線狀態
+func (p *NATSPublisher) PublishUserPresence(roomID, userID, username string, isOnline bool) error {
+	msg := types.PresenceMessage{
 		RoomID:   roomID,
 		UserID:   userID,
 		Username: username,
 		IsOnline: isOnline,
 	}
 
-	// 序列化消息
-	data, err := json.Marshal(presenceMsg)
+	data, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal presence message: %w", err)
+		return err
 	}
 
-	// 構建主題名稱
-	subject := fmt.Sprintf("chat.presence.%s", roomID)
+	topic := p.topics.GetPresenceTopic(roomID)
+	return p.natsManager.Publish(topic, data)
+}
 
-	// 發布消息
-	err = p.natsManager.Publish(subject, data)
+// RequestHistory 請求歷史消息
+func (p *NATSPublisher) RequestHistory(roomID string, userID string, limit int) error {
+	msg := types.HistoryRequest{
+		RoomID: roomID,
+		UserID: userID,
+		Limit:  limit,
+	}
+
+	data, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to publish presence message: %w", err)
+		return err
 	}
 
-	status := "joined"
-	if !isOnline {
-		status = "left"
-	}
-	log.Printf("Published presence update: %s %s room %s", username, status, roomID)
-	return nil
+	topic := p.topics.GetHistoryRequestTopic(roomID)
+	return p.natsManager.Publish(topic, data)
 }
