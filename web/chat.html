@@ -24,6 +24,29 @@
       font-size: 18px;
       font-weight: 600;
       box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .header-title {
+      flex-grow: 1;
+      text-align: center;
+    }
+    
+    .exit-button {
+      background-color: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background-color 0.2s;
+    }
+    
+    .exit-button:hover {
+      background-color: rgba(255, 255, 255, 0.3);
     }
     
     #messages {
@@ -64,6 +87,17 @@
       background: #4f46e5;
       color: white;
       border-bottom-right-radius: 4px;
+    }
+    
+    .system {
+      background: #333;
+      color: #aaa;
+      border-radius: 10px;
+      max-width: 80%;
+      margin: 8px auto;
+      font-size: 14px;
+      font-style: italic;
+      text-align: center;
     }
     
     .sender-name {
@@ -127,15 +161,50 @@
     #messages::-webkit-scrollbar-thumb:hover {
       background: #555;
     }
+    
+    /* Connection status */
+    .connection-status {
+      position: fixed;
+      bottom: 80px;
+      right: 16px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .connecting {
+      background: #f59e0b;
+      color: #fff;
+      opacity: 1;
+    }
+    
+    .connected {
+      background: #10b981;
+      color: #fff;
+      opacity: 1;
+    }
+    
+    .disconnected {
+      background: #ef4444;
+      color: #fff;
+      opacity: 1;
+    }
   </style>
 </head>
 <body>
-  <header>SettleChat</header>
+  <header>
+    <div class="header-title">SettleChat</div>
+    <button class="exit-button" onclick="exitRoom()">Exit Room</button>
+  </header>
   <div id="messages"></div>
   <footer>
     <input id="input" placeholder="Type your message..." />
     <button onclick="sendMessage()">Send</button>
   </footer>
+  
+  <div id="connectionStatus" class="connection-status">Connecting...</div>
   
   <script>
     const params = new URLSearchParams(window.location.search);
@@ -144,7 +213,124 @@
     const username = localStorage.getItem("username") || "Anonymous";
     if (!userID || !roomID) window.location.href = "/login.html";
     
-    const ws = new WebSocket(`${location.origin.replace("http", "ws")}/ws?room=${roomID}&user_id=${userID}&username=${username}`);
+    const connectionStatus = document.getElementById("connectionStatus");
+    let ws = null;
+    let reconnectAttempts = 0;
+    let heartbeatInterval;
+    
+    // Connect to WebSocket
+    function connectWebSocket() {
+      connectionStatus.className = "connection-status connecting";
+      connectionStatus.textContent = "Connecting...";
+      
+      ws = new WebSocket(`${location.origin.replace("http", "ws")}/ws?room=${roomID}&user_id=${userID}&username=${username}`);
+      
+      ws.onopen = function() {
+        console.log("WebSocket connection established");
+        connectionStatus.className = "connection-status connected";
+        connectionStatus.textContent = "Connected";
+        reconnectAttempts = 0;
+        
+        // Hide status after 2 seconds
+        setTimeout(function() {
+          connectionStatus.style.opacity = 0;
+        }, 2000);
+        
+        // Setup heartbeat
+        clearInterval(heartbeatInterval); // Clear any existing interval
+        heartbeatInterval = setInterval(function() {
+          if (ws.readyState === WebSocket.OPEN) {
+            // Send a special heartbeat message
+            const heartbeat = {
+              content: "",
+              sender_id: "",
+              type: "heartbeat"
+            };
+            try {
+              ws.send(JSON.stringify(heartbeat));
+              console.log("Heartbeat sent");
+            } catch (e) {
+              console.error("Failed to send heartbeat:", e);
+            }
+          }
+        }, 30000); // Every 30 seconds
+      };
+      
+      ws.onclose = function(event) {
+        console.log("WebSocket connection closed:", event);
+        clearInterval(heartbeatInterval);
+        
+        connectionStatus.className = "connection-status disconnected";
+        connectionStatus.textContent = "Disconnected. Reconnecting...";
+        connectionStatus.style.opacity = 1;
+        
+        // Don't try to reconnect if explicitly exited
+        if (event.code === 1000 && event.reason === "exit") {
+          console.log("Explicit exit, not reconnecting");
+          return;
+        }
+        
+        // Try to reconnect with exponential backoff
+        const delay = Math.min(30000, 1000 * Math.pow(1.5, reconnectAttempts));
+        console.log(`Reconnecting in ${delay/1000} seconds...`);
+        reconnectAttempts++;
+        
+        setTimeout(function() {
+          connectWebSocket();
+        }, delay);
+      };
+      
+      ws.onerror = function(error) {
+        console.error("WebSocket error:", error);
+        connectionStatus.className = "connection-status disconnected";
+        connectionStatus.textContent = "Connection error";
+        connectionStatus.style.opacity = 1;
+      };
+      
+      ws.onmessage = function(event) {
+        const msg = JSON.parse(event.data);
+        
+        // Handle system messages
+        if (msg.sender_id === "system") {
+          const container = document.createElement("div");
+          container.className = "message-container";
+          
+          const bubble = document.createElement("div");
+          bubble.className = "msg system";
+          bubble.textContent = msg.content;
+          
+          container.appendChild(bubble);
+          messages.appendChild(container);
+        } else {
+          // Handle normal messages
+          const isSelf = msg.sender_id === userID;
+          
+          const container = document.createElement("div");
+          container.className = "message-container" + (isSelf ? " self-container" : "");
+          
+          const bubble = document.createElement("div");
+          bubble.className = "msg " + (isSelf ? "self" : "received");
+          
+          const senderElement = document.createElement("div");
+          senderElement.className = "sender-name";
+          senderElement.textContent = isSelf ? "You" : msg.sender;
+          
+          const messageContent = document.createElement("div");
+          messageContent.textContent = msg.content;
+          
+          bubble.appendChild(senderElement);
+          bubble.appendChild(messageContent);
+          container.appendChild(bubble);
+          messages.appendChild(container);
+        }
+        
+        // Scroll to bottom
+        messages.scrollTop = messages.scrollHeight;
+      };
+    }
+    
+    // Initialize connection
+    connectWebSocket();
     
     const messages = document.getElementById("messages");
     const input = document.getElementById("input");
@@ -155,80 +341,38 @@
         sendMessage();
       }
     });
-
-    ws.onopen = function() {
-      console.log("WebSocket connection established");
-      
-      // 設置保持活躍的間隔檢查
-      setInterval(function() {
-        if (ws.readyState === WebSocket.OPEN) {
-          // 發送一個空的消息或自定義心跳
-          // 注意：某些WebSocket實現不支持客戶端發起的ping
-          // 所以我們發送一個特殊的JSON消息作為心跳
-          const heartbeat = {
-            type: "heartbeat"
-          };
-          try {
-            ws.send(JSON.stringify(heartbeat));
-            console.log("Heartbeat sent");
-          } catch (e) {
-            console.error("Failed to send heartbeat:", e);
-          }
-        }
-      }, 30000); // 每30秒發送一次心跳
-    };
-
-    ws.onclose = function(event) {
-      console.log("WebSocket connection closed:", event);
-      
-      // 可選：根據關閉代碼處理重連
-      if (event.code !== 1000) { // 非正常關閉
-        console.log("Connection lost, attempting to reconnect...");
-        // 這裡可以添加重連邏輯
-        setTimeout(function() {
-          // 重新加載頁面或重新建立連接
-          window.location.reload();
-        }, 3000); // 3秒後嘗試重連
-      }
-    };
-    
-    ws.onerror = function(error) {
-      console.error("WebSocket error:", error);
-    };
-
-    
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      const isSelf = msg.sender_id === userID;
-      
-      const container = document.createElement("div");
-      container.className = "message-container" + (isSelf ? " self-container" : "");
-      
-      const bubble = document.createElement("div");
-      bubble.className = "msg " + (isSelf ? "self" : "received");
-      
-      const senderElement = document.createElement("div");
-      senderElement.className = "sender-name";
-      senderElement.textContent = isSelf ? "You" : msg.sender;
-      
-      const messageContent = document.createElement("div");
-      messageContent.textContent = msg.content;
-      
-      bubble.appendChild(senderElement);
-      bubble.appendChild(messageContent);
-      container.appendChild(bubble);
-      messages.appendChild(container);
-      
-      // Scroll to bottom
-      messages.scrollTop = messages.scrollHeight;
-    };
     
     function sendMessage() {
       const text = input.value.trim();
       if (!text) return;
-      ws.send(JSON.stringify({ content: text }));
-      input.value = "";
+      
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ content: text }));
+        input.value = "";
+      } else {
+        alert("Connection lost. Please wait while we reconnect...");
+        connectionStatus.className = "connection-status disconnected";
+        connectionStatus.textContent = "Disconnected. Reconnecting...";
+        connectionStatus.style.opacity = 1;
+      }
     }
+    
+    function exitRoom() {
+      // Close WebSocket connection properly
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close(1000, "exit");
+      }
+      
+      // Navigate back to rooms page
+      window.location.href = "/rooms.html";
+    }
+    
+    // Handle page unload
+    window.addEventListener('beforeunload', function() {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close(1000, "exit");
+      }
+    });
   </script>
 </body>
 </html>

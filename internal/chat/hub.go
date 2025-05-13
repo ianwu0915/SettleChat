@@ -52,38 +52,50 @@ func (h *Hub) Run() {
 		case client := <-h.Register:
 			room := h.getOrCreateRoom(client.RoomID)
 			room.AddClient(client)
+
 			// Retrieve Historic message from the database
 			msgs, err := client.Hub.Store.GetRecentMessages(context.Background(), client.RoomID, 50)
 			if err != nil {
 				log.Printf("Error Retrieving Past Message from databases: %v", err)
 			}
+			// Send historic Messgage Safely 
 			for _, msg := range msgs {
+				// Check if the client exists in the room
+				room.mu.Lock()
+				_, exists := room.Clients[client.ID]
+				room.mu.Unlock()
+
+				if !exists {
+					log.Printf("Client %s no longer in room, skipping history message", client.ID)
+					break
+				}
+
 				select {
 				case client.Send <- msg:
+					log.Printf("Successfully send history message to %s", client.ID)
 				case <-time.After(2 * time.Second):
 					log.Printf("⚠️ timed out sending history to %s", client.ID)
+				default:
+					// 通道已滿或關閉，不進行處理
+					log.Printf("Cannot send history to client %s, channel might be closed", client.ID)
 				}
 			}
 
 		// Handle User Leave
 		case client := <-h.UnRegister:
 			// If the room exist
+			h.mu.Lock()
 			if room, ok := h.Rooms[client.RoomID]; ok {
 				room.RemoveClient(client)
-				if len(room.Clients) == 0 {
-					h.mu.Lock()
-					delete(h.Rooms, room.ID)
-					h.mu.Unlock()
-				}
+				// if len(room.Clients) == 0 {
+				// 	h.mu.Lock()
+				// 	delete(h.Rooms, room.ID)
+				// 	h.mu.Unlock()
+				// }
 			}
+			h.mu.Unlock()
 		}
 	}
 }
 
-func (h *Hub) Close() error {
-	// 確保取消所有訂閱
-	if h.Subscriber != nil {
-		h.Subscriber.Unsubscribe()
-	}
-	return nil
-}
+
