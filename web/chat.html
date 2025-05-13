@@ -328,20 +328,7 @@
         messages.scrollTop = messages.scrollHeight;
       };
     }
-    
-    // Initialize connection
-    connectWebSocket();
-    
-    const messages = document.getElementById("messages");
-    const input = document.getElementById("input");
-    
-    // Handle Enter key press
-    input.addEventListener("keypress", function(event) {
-      if (event.key === "Enter") {
-        sendMessage();
-      }
-    });
-    
+
     function sendMessage() {
       const text = input.value.trim();
       if (!text) return;
@@ -373,6 +360,34 @@
         ws.close(1000, "exit");
       }
     });
+    
+    // Initialize connection
+    connectWebSocket();
+    
+    const messages = document.getElementById("messages");
+    const input = document.getElementById("input");
+    
+    // Handle Enter key press
+    input.addEventListener("keypress", function(event) {
+      if (event.key === "Enter") {
+        sendMessage();
+      }
+    });
+    
+    function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+      
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ content: text }));
+        input.value = "";
+      } else {
+        alert("Connection lost. Please wait while we reconnect...");
+        connectionStatus.className = "connection-status disconnected";
+        connectionStatus.textContent = "Disconnected. Reconnecting...";
+        connectionStatus.style.opacity = 1;
+      }
+    }
   </script>
 </body>
 </html>

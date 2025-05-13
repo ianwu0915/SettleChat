@@ -13,14 +13,65 @@
       max-width: 640px;
       margin: auto;
     }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+    
     h2 {
-      text-align: center;
+      margin: 0;
+    }
+    
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #6366f1;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+    }
+    
+    .username {
+      font-weight: 500;
+    }
+    
+    .logout-btn {
+      background: none;
+      border: none;
+      color: #6b7280;
+      cursor: pointer;
+      font-size: 14px;
+      text-decoration: underline;
+      padding: 0;
+    }
+    
+    .logout-btn:hover {
+      color: #4f46e5;
+    }
+    
+    .welcome-text {
+      font-size: 16px;
+      color: #6b7280;
       margin-bottom: 24px;
     }
+    
     #roomList {
       list-style: none;
       padding: 0;
     }
+    
     #roomList li {
       background: white;
       padding: 16px;
@@ -31,6 +82,22 @@
       justify-content: space-between;
       align-items: center;
     }
+    
+    .room-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .room-name {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .room-meta {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    
     button {
       background-color: #4f46e5;
       border: none;
@@ -38,30 +105,67 @@
       padding: 10px 16px;
       border-radius: 6px;
       cursor: pointer;
+      font-weight: 500;
     }
+    
     button:hover {
       background-color: #4338ca;
     }
+    
     form {
       margin-top: 32px;
       display: flex;
       gap: 8px;
     }
+    
     input[type="text"] {
       flex: 1;
-      padding: 10px;
-      border: 1px solid #ccc;
+      padding: 12px;
+      border: 1px solid #d1d5db;
       border-radius: 6px;
+      font-size: 15px;
+    }
+    
+    input[type="text"]:focus {
+      outline: 2px solid #4f46e5;
+      border-color: transparent;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #6b7280;
+    }
+    
+    .empty-state p {
+      margin-bottom: 20px;
     }
   </style>
 </head>
 <body>
-  <h2>Welcome to SettleChat</h2>
+  <div class="header">
+    <h2>SettleChat</h2>
+    <div class="user-info">
+      <div class="user-avatar" id="userAvatar"></div>
+      <div>
+        <div class="username" id="usernameDisplay">Loading...</div>
+        <button class="logout-btn" onclick="logout()">Log out</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="welcome-text">Welcome back! Here are your chat rooms:</div>
+  
   <ul id="roomList"></ul>
+  
+  <div id="emptyState" class="empty-state" style="display: none;">
+    <p>You haven't joined any rooms yet.</p>
+    <p>Create your first room below to get started!</p>
+  </div>
 
   <form id="newRoomForm">
     <input type="text" id="roomName" placeholder="New room name..." required />
-    <button type="submit">Create</button>
+    <button type="submit">Create Room</button>
   </form>
 
   <script>
@@ -69,30 +173,68 @@
     console.log("[localStorage]", JSON.stringify(localStorage, null, 2));
     const API = location.origin;
     const userId = localStorage.getItem('user_id');
-    if (!userId) window.location.href = '/login.html';
+    const username = localStorage.getItem('username');
+    
+    if (!userId) {
+      window.location.href = '/login.html';
+    }
+    
+    // 設置用戶名顯示
+    const usernameDisplay = document.getElementById('usernameDisplay');
+    usernameDisplay.textContent = username || 'User';
+    
+    // 設置頭像顯示（使用首字母）
+    const userAvatar = document.getElementById('userAvatar');
+    if (username && username.length > 0) {
+      userAvatar.textContent = username.charAt(0).toUpperCase();
+    } else {
+      userAvatar.textContent = 'U';
+    }
 
     const roomList = document.getElementById('roomList');
+    const emptyState = document.getElementById('emptyState');
     const form = document.getElementById('newRoomForm');
 
     fetch(`${API}/rooms?user_id=${userId}`)
       .then(res => res.json())
       .then(data => {
         roomList.innerHTML = '';
+        
+        if (data.length === 0) {
+          emptyState.style.display = 'block';
+          return;
+        }
+        
+        emptyState.style.display = 'none';
+        
         data.forEach(room => {
-          console.log(room)
+          console.log(room);
           const li = document.createElement('li');
+          
+          // 格式化創建時間
+          const createdDate = new Date(room.created_at);
+          const dateStr = createdDate.toLocaleDateString();
+          
           li.innerHTML = `
-            <span><strong>${room.room_name}</strong></span>
+            <div class="room-info">
+              <span class="room-name">${room.room_name}</span>
+              <span class="room-meta">Created on ${dateStr}</span>
+            </div>
             <button onclick="enterRoom('${room.room_id}')">Enter</button>
           `;
           roomList.appendChild(li);
         });
+      })
+      .catch(error => {
+        console.error('Error fetching rooms:', error);
+        emptyState.style.display = 'block';
       });
 
     form.addEventListener('submit', e => {
       e.preventDefault();
       const name = document.getElementById('roomName').value.trim();
       if (!name) return;
+      
       fetch(`${API}/rooms/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,11 +243,24 @@
         .then(res => res.json())
         .then(data => {
           window.location.href = `/chat.html?room_id=${data.room_id}`;
+        })
+        .catch(error => {
+          console.error('Error creating room:', error);
+          alert('Failed to create room. Please try again.');
         });
     });
 
     function enterRoom(id) {
       window.location.href = `/chat.html?room_id=${id}`;
+    }
+    
+    function logout() {
+      // 清除本地存儲
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('username');
+      
+      // 重定向到登錄頁面
+      window.location.href = '/login.html';
     }
   </script>
 </body>

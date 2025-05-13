@@ -1,9 +1,10 @@
 package chat
 
 import (
+	"fmt"
 	"log"
 	"sync"
-	"fmt"
+
 	"github.com/ianwu0915/SettleChat/internal/messaging"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 )
@@ -44,7 +45,7 @@ func (r *Room) AddClient(client *Client) {
 	log.Printf("[%s] %s joined", r.ID, client.Username)
 }
 
-func (r *Room) RemoveClient(client *Client) {
+func (r *Room) SaveRemoveClient(client *Client) {
 	r.mu.Lock()
 	if _, exisit := r.Clients[client.ID]; exisit {
 		delete(r.Clients, client.ID)

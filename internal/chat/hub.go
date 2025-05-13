@@ -28,7 +28,6 @@ func NewHub(store *storage.PostgresStore, publisher *messaging.Publisher,subsbri
 		Store:      store,
 		Publisher: publisher,
 		Subscriber: subsbriber,
-	
 	}
 }
 
@@ -59,25 +58,26 @@ func (h *Hub) Run() {
 				log.Printf("Error Retrieving Past Message from databases: %v", err)
 			}
 			// Send historic Messgage Safely 
-			for _, msg := range msgs {
+			for i := len(msgs) -1; i>=0; i-- {
+				msg := msgs[i]
 				// Check if the client exists in the room
 				room.mu.Lock()
 				_, exists := room.Clients[client.ID]
 				room.mu.Unlock()
 
 				if !exists {
-					log.Printf("Client %s no longer in room, skipping history message", client.ID)
+					log.Printf("Client %s no longer in room, skipping history message", client.Username)
 					break
 				}
 
 				select {
 				case client.Send <- msg:
-					log.Printf("Successfully send history message to %s", client.ID)
+					log.Printf("Successfully send history message to %s", client.Username)
 				case <-time.After(2 * time.Second):
-					log.Printf("⚠️ timed out sending history to %s", client.ID)
+					log.Printf("⚠️ timed out sending history to %s", client.Username)
 				default:
 					// 通道已滿或關閉，不進行處理
-					log.Printf("Cannot send history to client %s, channel might be closed", client.ID)
+					log.Printf("Cannot send history to client %s, channel might be closed", client.Username)
 				}
 			}
 
@@ -86,7 +86,7 @@ func (h *Hub) Run() {
 			// If the room exist
 			h.mu.Lock()
 			if room, ok := h.Rooms[client.RoomID]; ok {
-				room.RemoveClient(client)
+				room.SaveRemoveClient(client)
 				// if len(room.Clients) == 0 {
 				// 	h.mu.Lock()
 				// 	delete(h.Rooms, room.ID)

@@ -47,7 +47,7 @@ func WebsocketHandler(hub *chat.Hub) http.HandlerFunc {
 			ID:       userID,
 			Username: username,
 			Conn:     conn,
-			Send:     make(chan storage.ChatMessage),
+			Send:     make(chan storage.ChatMessage, 256),
 			RoomID:   roomID,
 		}
 
