@@ -155,6 +155,47 @@
         sendMessage();
       }
     });
+
+    ws.onopen = function() {
+      console.log("WebSocket connection established");
+      
+      // 設置保持活躍的間隔檢查
+      setInterval(function() {
+        if (ws.readyState === WebSocket.OPEN) {
+          // 發送一個空的消息或自定義心跳
+          // 注意：某些WebSocket實現不支持客戶端發起的ping
+          // 所以我們發送一個特殊的JSON消息作為心跳
+          const heartbeat = {
+            type: "heartbeat"
+          };
+          try {
+            ws.send(JSON.stringify(heartbeat));
+            console.log("Heartbeat sent");
+          } catch (e) {
+            console.error("Failed to send heartbeat:", e);
+          }
+        }
+      }, 30000); // 每30秒發送一次心跳
+    };
+
+    ws.onclose = function(event) {
+      console.log("WebSocket connection closed:", event);
+      
+      // 可選：根據關閉代碼處理重連
+      if (event.code !== 1000) { // 非正常關閉
+        console.log("Connection lost, attempting to reconnect...");
+        // 這裡可以添加重連邏輯
+        setTimeout(function() {
+          // 重新加載頁面或重新建立連接
+          window.location.reload();
+        }, 3000); // 3秒後嘗試重連
+      }
+    };
+    
+    ws.onerror = function(error) {
+      console.error("WebSocket error:", error);
+    };
+
     
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);

@@ -30,7 +30,7 @@ type Client struct {
 
 const (
 	writeWait      = 10 * time.Second
-	pongWait       = 60 * time.Second
+	pongWait       = 120 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
 	maxMessageSize = 1024
 )
@@ -58,13 +58,17 @@ func (c *Client) WritePump() {
 			}
 
 			if err := c.Conn.WriteJSON(message); err != nil {
+				log.Printf("Error writing to WebSocket: %v", err)
 				return
 			}
 
 		case <-ticker.C:
+			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				log.Printf("Error sending ping to client %s: %v", c.ID, err)
 				return
 			}
+			log.Printf("Sent ping to client: %s", c.ID) // 可選：用於調試
 		}
 	}
 }
@@ -77,28 +81,43 @@ func (c *Client) ReadPump() {
 		c.Conn.Close()
 	}()
 
+	// 設置最大消息大小
 	c.Conn.SetReadLimit(maxMessageSize)
+	
+	// 設置初始的讀取截止時間
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	
+	// 設置pong處理器，每當收到pong就延長截止時間
+	c.Conn.SetPongHandler(func(string) error { 
+		// 重設讀取截止時間
+		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+		log.Printf("Received pong from client: %s", c.ID) // 可選：用於調試
+		return nil 
+	})
+
 	for {
 		var msg storage.ChatMessage
 		log.Println("waiting for message...")
-		// 會接收content
+
+		// Read Message from WebSocket
 		if err := c.Conn.ReadJSON(&msg); err != nil {
-			log.Println("read error: ", err)
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Println("unexpected close error:", err)
+			} else {
+				log.Println("client closed connection:", err)
+			}
 			break
 		}
 
-		log.Printf("[%s] %s: %s ", c.ID, c.Username, msg.Content)
+		// 處理前端發送的心跳消息
+		if msg.Content == "" && msg.SenderID == "" {
+			// 這可能是前端發送的心跳消息，重置超時並忽略它
+			c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+			log.Printf("Received heartbeat from client: %s", c.ID)
+			continue
+		}
 
-		// if err := c.Conn.ReadJSON(&msg); err != nil {
-		// 	if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-		// 		log.Println("unexpected close error:", err)
-		// 	} else {
-		// 		log.Println("client closed connection:", err)
-		// 	}
-		// 	break
-		// }
+		log.Printf("[%s] %s: %s ", c.ID, c.Username, msg.Content)
 
 		// 補上其他field
 		msg.RoomID = c.RoomID
@@ -106,6 +125,8 @@ func (c *Client) ReadPump() {
 		msg.Sender = c.Username
 		msg.Timestamp = time.Now()
 		
+		// 每次收到消息，重設讀取截止時間
+		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 
 		// !! 改成Publisher 發佈消息到NATS 而不是直接存到數據庫
 		if err := c.Hub.Publisher.PublishChatMessage(msg); err != nil {
