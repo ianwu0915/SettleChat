@@ -98,18 +98,17 @@ func (s *Subscriber) SubscribeToRoom(roomID string) error {
 	historyMessageRequestTopic := s.Topics.GetHistoryRequestTopic(roomID)
 	log.Printf("Subscribing to history message topic: %s", historyMessageRequestTopic)
 	if err := s.SubscribeTopic(historyMessageRequestTopic); err != nil {
-		log.Printf("Failed to subscribe to presence topic: %v", err)
+		log.Printf("Failed to subscribe to history message topic: %v", err)
 		return err
 	}
 
-
-	// historyMessageResponseTopic := s.Topics.GetHistoryResponseTopic(roomID, clientId )
-	// log.Printf("Subscribing to history message topic: %s", historyMessageResponseTopic)
-	// if err := s.subscribeTopic(historyMessageRequestTopic); err != nil {
-	// 	log.Printf("Failed to subscribe to presence topic: %v", err)
-	// 	return err
-	// }
-
+	// 訂閱連接事件
+	connectionTopic := s.Topics.GetConnectionTopic(roomID)
+	log.Printf("Subscribing to connection event topic: %s", connectionTopic)
+	if err := s.SubscribeTopic(connectionTopic); err != nil {
+		log.Printf("Failed to subscribe to connection event topic: %v", err)
+		return err
+	}
 
 	log.Printf("Successfully subscribed to all topics for room: %s", roomID)
 	return nil
@@ -118,10 +117,10 @@ func (s *Subscriber) SubscribeToRoom(roomID string) error {
 // SubscribeTopic 訂閱特定主題
 func (s *Subscriber) SubscribeTopic(topic string) error {
 	log.Printf("Attempting to subscribe to topic: %s", topic)
-	
+
 	sub, err := s.natsManager.Subscribe(topic, func(msg *nats.Msg) {
 		log.Printf("Received message on topic: %s", msg.Subject)
-		
+
 		// 從主題中提取類別和動作
 		parts := parseTopic(msg.Subject)
 		if len(parts) < 4 {
@@ -131,7 +130,7 @@ func (s *Subscriber) SubscribeTopic(topic string) error {
 
 		handlerKey := parts[1] + "." + parts[2]
 		log.Printf("Looking for handler with key: %s", handlerKey)
-		
+
 		handler, exists := s.handlers[handlerKey]
 		if !exists {
 			log.Printf("Error: No handler found for topic: %s (key: %s)", msg.Subject, handlerKey)
@@ -160,30 +159,30 @@ func (s *Subscriber) SubscribeTopic(topic string) error {
 func parseTopic(topic string) []string {
 	parts := strings.Split(topic, ".")
 	log.Printf("Parsed topic %s into %d parts", topic, len(parts))
-	
+
 	// 如果是歷史消息相關主題，需要特殊處理
 	if len(parts) >= 4 && parts[1] == "message" {
 		if parts[2] == "history" && parts[3] == "request" {
 			// 將 history.request 作為一個完整的 action
 			newParts := make([]string, 0)
-			newParts = append(newParts, parts[0])  // settlechat
-			newParts = append(newParts, parts[1])  // message
+			newParts = append(newParts, parts[0])          // settlechat
+			newParts = append(newParts, parts[1])          // message
 			newParts = append(newParts, "history.request") // 完整的 action
-			newParts = append(newParts, parts[4:]...) // roomID 等其他部分
+			newParts = append(newParts, parts[4:]...)      // roomID 等其他部分
 			log.Printf("Reformatted history request topic parts: %v", newParts)
 			return newParts
 		} else if parts[2] == "history" && parts[3] == "response" {
 			// 將 history.response 作為一個完整的 action
 			newParts := make([]string, 0)
-			newParts = append(newParts, parts[0])  // settlechat
-			newParts = append(newParts, parts[1])  // message
+			newParts = append(newParts, parts[0])           // settlechat
+			newParts = append(newParts, parts[1])           // message
 			newParts = append(newParts, "history.response") // 完整的 action
-			newParts = append(newParts, parts[4:]...) // roomID 和 userID
+			newParts = append(newParts, parts[4:]...)       // roomID 和 userID
 			log.Printf("Reformatted history response topic parts: %v", newParts)
 			return newParts
 		}
 	}
-	
+
 	return parts
 }
 

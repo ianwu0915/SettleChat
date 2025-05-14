@@ -20,19 +20,9 @@ func (t *TopicFormatter) formatTopic(category, action, roomID string) string {
 	return fmt.Sprintf("%s.%s.%s.%s", t.basePrefix, category, action, roomID)
 }
 
-// GetMessageTopic 返回聊天消息的主題
-func (t *TopicFormatter) GetMessageTopic(roomID string) string {
-	return t.formatTopic("message", "chat", roomID)
-}
-
 // GetPresenceTopic 返回在線狀態的主題
 func (t *TopicFormatter) GetPresenceTopic(roomID string) string {
 	return t.formatTopic("user", "presence", roomID)
-}
-
-// GetHistoryTopic 返回歷史消息請求的主題
-func (t *TopicFormatter) GetHistoryTopic(roomID string) string {
-	return t.formatTopic("message", "history", roomID)
 }
 
 // GetSystemMessageTopic 返回系統消息的主題
@@ -50,6 +40,11 @@ func (t *TopicFormatter) GetUserLeftTopic(roomID string) string {
 	return t.formatTopic("user", "left", roomID)
 }
 
+// GetMessageTopic 返回聊天消息的主題
+func (t *TopicFormatter) GetMessageTopic(roomID string) string {
+	return t.formatTopic("message", "chat", roomID)
+}
+
 // GetBroadcastTopic 返回廣播消息的主題
 func (t *TopicFormatter) GetBroadcastTopic(roomID string) string {
 	return t.formatTopic("message", "broadcast", roomID)
@@ -63,4 +58,9 @@ func (t *TopicFormatter) GetHistoryRequestTopic(roomID string) string {
 // GetHistoryResponseTopic 返回歷史消息響應的主題
 func (t *TopicFormatter) GetHistoryResponseTopic(roomID, userID string) string {
 	return fmt.Sprintf("%s.%s", t.formatTopic("message", "history.response", roomID), userID)
-} 
+}
+
+// GetConnectionTopic 返回連接事件的主題
+func (t *TopicFormatter) GetConnectionTopic(roomID string) string {
+	return t.formatTopic("connection", "event", roomID)
+}

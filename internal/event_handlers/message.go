@@ -30,11 +30,55 @@ func NewChatMessageHandler(store *storage.PostgresStore, publisher types.NATSPub
 }
 
 func (h *ChatMessageHandler) Handle(msg *nats.Msg) error {
-	var chatMsg storage.ChatMessage
-	if err := json.Unmarshal(msg.Data, &chatMsg); err != nil {
-		return err
-	}
+	// 先嘗試解析為 types.ChatMessageEvent
+	var event types.ChatMessageEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		log.Printf("嘗試舊的方式直接解析為 storage.ChatMessage")
+		// 嘗試舊的方式直接解析為 storage.ChatMessage
+		
+		var chatMsg storage.ChatMessage
+		if err := json.Unmarshal(msg.Data, &chatMsg); err != nil {
+			log.Printf("舊方式解析失敗: %v", err)
+			return err
+		}
+		
+		// 確保必要的字段存在
+		if chatMsg.SenderID == "" {
+			log.Printf("Warning: SenderID is empty in the message")
+		}
+		if chatMsg.Sender == "" {
+			log.Printf("Warning: Sender is empty in the message")
+		}
+		
+		// 儲存消息到數據庫
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
+		if err := h.store.SaveMessage(ctx, chatMsg); err != nil {
+			log.Printf("Failed to save message to database: %v", err)
+			return err
+		}
+
+		// 廣播消息給所有客戶端
+		broadcastTopic := h.topics.GetBroadcastTopic(chatMsg.RoomID)
+		if err := h.publisher.Publish(broadcastTopic, msg.Data); err != nil {
+			log.Printf("Failed to broadcast message: %v", err)
+			return err
+		}
+
+		return nil
+	}
+	
+	// 成功解析為 ChatMessageEvent，轉換為 storage.ChatMessage
+	log.Printf("成功解析為 ChatMessageEvent，轉換為 storage.ChatMessage")
+	chatMsg := storage.ChatMessage{
+		RoomID:    event.RoomID,
+		SenderID:  event.SenderID,
+		Sender:    event.Sender,
+		Content:   event.Content,
+		Timestamp: event.Timestamp,
+	}
+	
 	// 儲存消息到數據庫
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -44,13 +88,21 @@ func (h *ChatMessageHandler) Handle(msg *nats.Msg) error {
 		return err
 	}
 
+	// 將 chatMsg 重新序列化以便廣播
+	broadcastData, err := json.Marshal(chatMsg)
+	if err != nil {
+		log.Printf("Failed to marshal chat message for broadcast: %v", err)
+		return err
+	}
+
 	// 廣播消息給所有客戶端
 	broadcastTopic := h.topics.GetBroadcastTopic(chatMsg.RoomID)
-	if err := h.publisher.Publish(broadcastTopic, msg.Data); err != nil {
+	if err := h.publisher.Publish(broadcastTopic, broadcastData); err != nil {
 		log.Printf("Failed to broadcast message: %v", err)
 		return err
 	}
 
+	log.Printf("Message from %s processed and broadcasted successfully", chatMsg.Sender)
 	return nil
 }
 
@@ -126,9 +178,24 @@ func NewBroadcastHandler(hub *chat.Hub) *BroadcastHandler {
 
 func (h *BroadcastHandler) Handle(msg *nats.Msg) error {
 	var chatMsg storage.ChatMessage
-	if err := json.Unmarshal(msg.Data, &chatMsg); err != nil {
-		log.Printf("Failed to unmarshal broadcast message: %v", err)
-		return err
+	
+	// 先嘗試解析為 types.ChatMessageEvent
+	var event types.ChatMessageEvent
+	if err := json.Unmarshal(msg.Data, &event); err != nil {
+		// 嘗試舊的方式直接解析為 storage.ChatMessage
+		if err := json.Unmarshal(msg.Data, &chatMsg); err != nil {
+			log.Printf("Failed to unmarshal broadcast message: %v", err)
+			return err
+		}
+	} else {
+		// 從 event 轉換為 storage.ChatMessage
+		chatMsg = storage.ChatMessage{
+			RoomID:    event.RoomID,
+			SenderID:  event.SenderID,
+			Sender:    event.Sender,
+			Content:   event.Content,
+			Timestamp: event.Timestamp,
+		}
 	}
 
 	// 獲取對應的房間
@@ -155,7 +222,7 @@ func (h *BroadcastHandler) Handle(msg *nats.Msg) error {
 	return nil
 }
 
-// HistoryResponseHandler 處理歷史消息響應
+// HistoryResponseHandler 處理歷史消息回應
 type HistoryResponseHandler struct {
 	hub *chat.Hub
 }
@@ -181,7 +248,7 @@ func (h *HistoryResponseHandler) Handle(msg *nats.Msg) error {
 	}
 	userID := parts[5]
 
-	log.Printf("Received history response for room %s, user %s with %d messages", 
+	log.Printf("Received history response for room %s, user %s with %d messages",
 		response.RoomID, userID, len(response.Messages))
 
 	// 查找對應的客戶端
@@ -191,17 +258,57 @@ func (h *HistoryResponseHandler) Handle(msg *nats.Msg) error {
 		return fmt.Errorf("client not found: room=%s, user=%s", response.RoomID, userID)
 	}
 
+	// 計算消息總數，以便顯示進度
+	totalMessages := len(response.Messages)
+	if totalMessages == 0 {
+		log.Printf("No history messages to send for client %s", client.ID)
+		return nil
+	}
+
 	// 發送歷史消息（已經是按時間順序從舊到新排列）
-	for _, message := range response.Messages {
-		select {
-		case client.Send <- message:
-			log.Printf("Sent history message to client %s", client.ID)
-		default:
-			log.Printf("Client %s send buffer full, history message dropped", client.ID)
-			return fmt.Errorf("client send buffer full")
+	// 使用批量發送策略，每批次發送5條消息，並在批次之間添加短暫延遲
+	const batchSize = 10
+	const delayBetweenBatches = 50 * time.Millisecond
+	
+	for i := 0; i < totalMessages; i += batchSize {
+		// 計算當前批次的結束位置
+		end := i + batchSize
+		if end > totalMessages {
+			end = totalMessages
+		}
+		
+		// 處理當前批次的消息
+		for j := i; j < end; j++ {
+			message := response.Messages[j]
+			select {
+			case client.Send <- message:
+				log.Printf("Sent history message %d/%d to client %s", j+1, totalMessages, client.ID)
+			default:
+				log.Printf("Client %s send buffer full at message %d/%d, waiting before retry...", 
+					client.ID, j+1, totalMessages)
+				
+				// 如果發送通道已滿，等待一段時間後再嘗試
+				time.Sleep(100 * time.Millisecond)
+				
+				// 重試發送，如果仍然失敗則報錯
+				select {
+				case client.Send <- message:
+					log.Printf("Retry success: Sent history message %d/%d to client %s", 
+						j+1, totalMessages, client.ID)
+				default:
+					log.Printf("Client %s send buffer still full after retry, message %d/%d dropped", 
+						client.ID, j+1, totalMessages)
+					return fmt.Errorf("client send buffer full after retry")
+				}
+			}
+		}
+		
+		// 批次之間添加延遲，給客戶端處理消息的時間
+		if end < totalMessages {
+			time.Sleep(delayBetweenBatches)
 		}
 	}
 
-	log.Printf("Successfully sent all history messages to client %s", client.ID)
+	log.Printf("Successfully sent all %d history messages to client %s", totalMessages, client.ID)
 	return nil
-} 
+}

@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/ianwu0915/SettleChat/internal/messaging"
+	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
@@ -13,13 +13,15 @@ type RoomHandler struct {
 	DB        *storage.PostgresStore
 	publisher *messaging.NATSPublisher
 	env       string
+	EventBus  *messaging.EventBus
 }
 
-func NewRoomHandler(store *storage.PostgresStore, publisher *messaging.NATSPublisher, env string) *RoomHandler {
+func NewRoomHandler(store *storage.PostgresStore, publisher *messaging.NATSPublisher, env string, eventBus *messaging.EventBus) *RoomHandler {
 	return &RoomHandler{
 		DB:        store,
 		publisher: publisher,
 		env:       env,
+		EventBus:  eventBus,
 	}
 }
 
@@ -39,6 +41,10 @@ type leaveRoomRequest struct {
 	UserID string `json:"user_id"`
 }
 
+// CreateRoom 創建房間:
+// 1. 獲取用戶信息
+// 2. 創建房間
+// 3. 發布用戶加入事件
 func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 	var req createRoomRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -61,14 +67,26 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 發布用戶加入事件
-	if err := h.publisher.PublishUserJoined(rid, req.UserID, user.UserName); err != nil {
-		log.Printf("Failed to publish user joined event: %v", err)
+	if h.EventBus != nil {
+		if err := h.EventBus.PublishUserJoinedEvent(rid, req.UserID, user.UserName); err != nil {
+			log.Printf("Failed to publish New UserJoin event: %v", err)
+		} else {
+			log.Printf("Published New UserJoin event for %s in room %s", user.UserName, rid)
+		}
 	}
 
-	json.NewEncoder(w).Encode(map[string]string{"room_id": rid})
+	// // 發布用戶加入事件
+	// if err := h.publisher.PublishUserJoined(rid, req.UserID, user.UserName); err != nil {
+	// 	log.Printf("Failed to publish user joined event: %v", err)
+	// }
+
+	json.NewEncoder(w).Encode(map[string]string{"room_id": rid}) //?
 }
 
+// JoinRoom 加入房間:
+// Handle HTTP Reqeust for User Join
+// 1. 獲取用戶信息
+// 2. 發布用戶加入請求事件
 func (h *RoomHandler) JoinRoom(w http.ResponseWriter, r *http.Request) {
 	var req joinRoomRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -76,7 +94,71 @@ func (h *RoomHandler) JoinRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 移除用戶加入事件的發布，因為它已在 Room.AddClient 中處理
+	// // 發布用戶加入請求事件
+	// data, err := json.Marshal(map[string]interface{}{
+	// 	"room_id":    req.RoomID,
+	// 	"user_id":    req.UserID,
+	// 	"username":   req.Username,
+	// 	"timestamp":  time.Now(),
+	// 	"event_type": "join_request",
+	// // })
+	// if err != nil {
+	// 	log.Printf("Failed to marshal join request: %v", err)
+	// 	http.Error(w, "internal server error", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// // 使用系統消息主題發布加入請求事件
+	// // 注意：理想情況下應該有專門的 join.request 主題
+	// topic := h.publisher.GetTopics().GetSystemMessageTopic(req.RoomID)
+	// if err := h.publisher.Publish(topic, data); err != nil {
+	// 	log.Printf("Failed to publish join request: %v", err)
+	// 	http.Error(w, "internal server error", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	if h.EventBus != nil {
+		if err := h.EventBus.PublishUserJoinedEvent(req.RoomID, req.UserID, req.Username); err != nil {
+			log.Printf("Failed to publish New UserJoin event: %v", err)
+		} else {
+			log.Printf("Published New UserJoin event for %s in room %s", req.Username, req.RoomID)
+		}
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// LeaveRoom 加入房間:
+// Handle HTTP Reqeust for User Left
+func (h *RoomHandler) LeaveRoom(w http.ResponseWriter, r *http.Request) {
+	var req leaveRoomRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// 獲取用戶信息
+	user, err := h.DB.GetUserByID(r.Context(), req.UserID)
+	if err != nil {
+		log.Printf("Failed to get user info: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if h.EventBus != nil {
+		if err := h.EventBus.PublishUserLeftEvent(req.RoomID, user.ID, user.UserName); err != nil {
+			log.Printf("Failed to publish New UserLeft event: %v", err)
+		} else {
+			log.Printf("Published New UserLeft event for %s in room %s", user.UserName, req.RoomID)
+		}
+	}
+
+	// 發布用戶離開事件
+	// if err := h.publisher.PublishUserLeft(req.RoomID, req.UserID, user.UserName); err != nil {
+	// 	log.Printf("Failed to publish user left event: %v", err)
+	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
+	// 	return
+	// }
 
 	w.WriteHeader(http.StatusOK)
 }
@@ -95,29 +177,4 @@ func (h *RoomHandler) GetUserRooms(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(rooms)
-}
-
-func (h *RoomHandler) LeaveRoom(w http.ResponseWriter, r *http.Request) {
-	var req leaveRoomRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// 獲取用戶信息
-	user, err := h.DB.GetUserByID(r.Context(), req.UserID)
-	if err != nil {
-		log.Printf("Failed to get user info: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// 發布用戶離開事件
-	if err := h.publisher.PublishUserLeft(req.RoomID, req.UserID, user.UserName); err != nil {
-		log.Printf("Failed to publish user left event: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
 }

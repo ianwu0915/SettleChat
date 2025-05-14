@@ -45,4 +45,4 @@ func (h *SystemMessageHandler) Handle(msg *nats.Msg) error {
 	}
 
 	return h.publisher.Publish(messageTopic, messageData)
-} 
+}

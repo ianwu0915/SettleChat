@@ -5,9 +5,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/ianwu0915/SettleChat/internal/types"
+	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
 	"github.com/ianwu0915/SettleChat/internal/storage"
-
 )
 
 // Define Client Struct
@@ -19,16 +18,20 @@ type Client struct {
 	Conn     *websocket.Conn
 	Send     chan storage.ChatMessage // Message received from broadcast to the room
 	RoomID   string
+	EventBus *messaging.EventBus
 }
 
-// // Define Message Struct
-// type ChatMessage struct {
-// 	RoomID    string    `json:"room_id"`
-// 	SenderID  string    `json:"sender_id"`
-// 	Sender    string    `json:"sender"`
-// 	Content   string    `json:"content"`
-// 	Timestamp time.Time `json:"timestamp"`
-// }
+func NewClient(hub *Hub, id, username string, conn *websocket.Conn, roomID string, eventBus *messaging.EventBus) *Client {
+	return &Client{
+		Hub:      hub,
+		ID:       id,
+		Username: username,
+		Conn:     conn,
+		Send:     make(chan storage.ChatMessage),
+		RoomID:   roomID,
+		EventBus: eventBus,
+	}
+}
 
 const (
 	writeWait      = 10 * time.Second
@@ -85,20 +88,20 @@ func (c *Client) ReadPump() {
 
 	// 設置最大消息大小
 	c.Conn.SetReadLimit(maxMessageSize)
-	
+
 	// 設置初始的讀取截止時間
 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
-	
+
 	// 設置pong處理器，每當收到pong就延長截止時間
-	c.Conn.SetPongHandler(func(string) error { 
+	c.Conn.SetPongHandler(func(string) error {
 		// 重設讀取截止時間
 		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 		log.Printf("Received pong from client: %s", c.ID) // 可選：用於調試
-		return nil 
+		return nil
 	})
 
 	for {
-		var msg types.ChatMessage
+		var msg storage.ChatMessage
 		log.Println("waiting for message...")
 
 		// Read Message from WebSocket
@@ -122,26 +125,29 @@ func (c *Client) ReadPump() {
 		log.Printf("[%s] %s: %s ", c.ID, c.Username, msg.Content)
 
 		// 補上其他field
-		msg.RoomID = c.RoomID
-		msg.SenderID = c.ID
-		msg.Sender = c.Username
-		msg.Timestamp = time.Now()
-		
+		// msg.RoomID = c.RoomID
+		// msg.SenderID = c.ID
+		// msg.Sender = c.Username
+		// msg.Timestamp = time.Now()
+
 		// 每次收到消息，重設讀取截止時間
 		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 
-		// !! 改成Publisher 發佈消息到NATS 而不是直接存到數據庫
-		if err := c.Hub.Publisher.PublishMessage(msg); err != nil {
-			log.Printf("Failed to publish message: %v", err)
-			continue
+		// 發佈新消息傳送事件（使用eventbus)
+		if c.EventBus != nil {
+			if err := c.EventBus.PublishNewMessageEvent(c.RoomID, c.ID, c.Username, msg.Content); err != nil {
+				log.Printf("Failed to publish New Message event: %v", err)
+			} else {
+				log.Printf("Published NewMessage event for %s in room %s", c.Username, c.RoomID)
+			}
+		} else {
+			log.Printf("EventBus is nil!!")
 		}
 
-		// if err := c.Hub.Store.SaveMessage(context.Background(), msg); err != nil {
-		// 	log.Printf("❌ failed to save message to DB: %v", err)
+		// if err := c.Hub.Publisher.PublishMessage(msg); err != nil {
+		// 	log.Printf("Failed to publish message: %v", err)
+		// 	continue
 		// }
-
-		// room := c.Hub.getOrCreateRoom(c.RoomID)
-		// room.Broadcast <- msg
 
 	}
 }

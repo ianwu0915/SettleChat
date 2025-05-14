@@ -1,4 +1,4 @@
-package ws
+package handler
 
 import (
 	"log"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/ianwu0915/SettleChat/internal/chat"
-	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
 var upgrader = websocket.Upgrader{
@@ -41,15 +40,8 @@ func WebsocketHandler(hub *chat.Hub) http.HandlerFunc {
 			return
 		}
 
-		// Construct Client
-		client := &chat.Client{
-			Hub:      hub,
-			ID:       userID,
-			Username: username,
-			Conn:     conn,
-			Send:     make(chan storage.ChatMessage, 256),
-			RoomID:   roomID,
-		}
+		// Construct Client using NewClient function
+		client := chat.NewClient(hub, userID, username, conn, roomID, hub.EventBus)
 
 		// Register the client into the room
 		hub.Register <- client

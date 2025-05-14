@@ -19,4 +19,5 @@ type TopicFormatter interface {
 	GetUserJoinedTopic(roomID string) string
 	GetUserLeftTopic(roomID string) string
 	GetBroadcastTopic(roomID string) string
-} 
+	GetConnectionTopic(roomID string) string
+}

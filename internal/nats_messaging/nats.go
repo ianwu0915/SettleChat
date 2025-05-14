@@ -5,15 +5,16 @@ import (
 	"log"
 	"sync"
 	"time"
+
 	"github.com/nats-io/nats.go"
 )
 
 type NATSManager struct {
-	conn *nats.Conn
-	reconnect bool 
-	url string
-	mutex sync.RWMutex
-	options []nats.Option
+	conn      *nats.Conn
+	reconnect bool
+	url       string
+	mutex     sync.RWMutex
+	options   []nats.Option
 }
 
 func NewNATSManager(url string, reconnect bool) *NATSManager {
@@ -22,7 +23,7 @@ func NewNATSManager(url string, reconnect bool) *NATSManager {
 	}
 
 	return &NATSManager{
-		url: url,
+		url:       url,
 		reconnect: reconnect,
 	}
 }
@@ -42,7 +43,7 @@ func (m *NATSManager) Connect() error {
 			log.Printf("NATS disconnected: %v", err)
 		}),
 		nats.ReconnectHandler(func(nc *nats.Conn) {
-			log.Printf("NASTS reconnected to %s", nc.ConnectedUrl() )
+			log.Printf("NASTS reconnected to %s", nc.ConnectedUrl())
 		}),
 		nats.ErrorHandler(func(nc *nats.Conn, s *nats.Subscription, err error) {
 			log.Printf("NATS error: %v", err)
@@ -54,7 +55,7 @@ func (m *NATSManager) Connect() error {
 		// nats.PingInterval(time.Minute * 2)  // 心跳 ping 頻率
 	}
 
-	// Handle Customized options 
+	// Handle Customized options
 	if len(m.options) > 0 {
 		opts = append(opts, m.options...)
 	}
@@ -77,14 +78,14 @@ func (m *NATSManager) Disconnect() {
 	defer m.mutex.Unlock()
 
 	if m.conn != nil {
-		m.conn.Drain() // Blocking call 
-		m.conn = nil 
+		m.conn.Drain() // Blocking call
+		m.conn = nil
 		log.Println("Disconnected from NATS server")
 
 	}
 }
 
-// Get the Server conn 
+// Get the Server conn
 // If it's disconnected, will try to reconncet with nats server
 func (m *NATSManager) GetConn() (*nats.Conn, error) {
 	m.mutex.RLock()
@@ -100,12 +101,12 @@ func (m *NATSManager) GetConn() (*nats.Conn, error) {
 
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
-	return m.conn, nil 
+	return m.conn, nil
 }
 
 // Publish data to the Subject
 func (m *NATSManager) Publish(subject string, data []byte) error {
-	conn, err := m.GetConn();
+	conn, err := m.GetConn()
 	if err != nil {
 		log.Printf("Couldn't Publish since its Disconnected with the server: %s", err)
 	}
@@ -119,11 +120,11 @@ func (m *NATSManager) Publish(subject string, data []byte) error {
 // 回調函數是並發執行的：不同訂閱的回調函數會在 NATS 客戶端的不同 goroutine 中並發執行
 // 只有取消訂閱後，會結束
 func (m *NATSManager) Subscribe(subject string, msgHandler nats.MsgHandler) (*nats.Subscription, error) {
-	conn, err := m.GetConn();
+	conn, err := m.GetConn()
 	if err != nil {
 		log.Printf("Couldn't Publish since its Disconnected with the server: %s", err)
 	}
-	
+
 	return conn.Subscribe(subject, msgHandler)
 }
 

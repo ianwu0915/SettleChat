@@ -102,11 +102,11 @@ func (h *UserLeftHandler) Handle(msg *nats.Msg) error {
 		return err
 	}
 
-	// 從房間中移除用戶
-	if err := h.store.RemoveUserFromRoom(context.Background(), payload.UserID, payload.RoomID); err != nil {
-		log.Printf("Failed to remove user from room in database: %v", err)
-		return err
-	}
+	// // 從房間中移除用戶
+	// if err := h.store.RemoveUserFromRoom(context.Background(), payload.UserID, payload.RoomID); err != nil {
+	// 	log.Printf("Failed to remove user from room in database: %v", err)
+	// 	return err
+	// }
 
 	// 發布系統消息
 	systemMsg := fmt.Sprintf("%s left the room", payload.Username)
@@ -146,17 +146,17 @@ func (h *UserLeftHandler) Handle(msg *nats.Msg) error {
 
 // PresenceHandler 處理用戶在線狀態
 type PresenceHandler struct {
-	store     *storage.PostgresStore
-	topics    types.TopicFormatter
-	env       string
+	store  *storage.PostgresStore
+	topics types.TopicFormatter
+	env    string
 }
 
 // NewPresenceHandler 創建新的 PresenceHandler
-func NewPresenceHandler(store *storage.PostgresStore,  topics types.TopicFormatter, env string) *PresenceHandler {
+func NewPresenceHandler(store *storage.PostgresStore, topics types.TopicFormatter, env string) *PresenceHandler {
 	return &PresenceHandler{
-		store:     store,
-		topics:    topics,
-		env:       env,
+		store:  store,
+		topics: topics,
+		env:    env,
 	}
 }
 
@@ -180,8 +180,8 @@ func (h *PresenceHandler) Handle(msg *nats.Msg) error {
 		// 不返回錯誤，因為這不是關鍵操作
 	}
 
-	log.Printf("Updated presence for user %s (%s) in room %s: online=%v", 
+	log.Printf("Updated presence for user %s (%s) in room %s: online=%v",
 		presence.Username, presence.UserID, presence.RoomID, presence.IsOnline)
 
 	return nil
-} 
+}

@@ -4,7 +4,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/ianwu0915/SettleChat/internal/messaging"
+	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/ianwu0915/SettleChat/internal/types"
 )
@@ -17,10 +17,11 @@ type Hub struct {
 	Publisher  *messaging.NATSPublisher
 	Subscriber *messaging.Subscriber
 	Topics     types.TopicFormatter
+	EventBus   *messaging.EventBus
 	mu         sync.Mutex
 }
 
-func NewHub(store *storage.PostgresStore, publisher *messaging.NATSPublisher, subscriber *messaging.Subscriber, topics types.TopicFormatter) *Hub {
+func NewHub(store *storage.PostgresStore, publisher *messaging.NATSPublisher, subscriber *messaging.Subscriber, topics types.TopicFormatter, eventbus *messaging.EventBus) *Hub {
 	hub := &Hub{
 		Rooms:      make(map[string]*Room),
 		Register:   make(chan *Client),
@@ -29,6 +30,7 @@ func NewHub(store *storage.PostgresStore, publisher *messaging.NATSPublisher, su
 		Publisher:  publisher,
 		Subscriber: subscriber,
 		Topics:     topics,
+		EventBus:   eventbus,
 	}
 
 	return hub
@@ -41,7 +43,7 @@ func (h *Hub) getOrCreateRoom(id string) *Room {
 	room, exist := h.Rooms[id]
 	if !exist {
 		log.Printf("Creating new room: %s", id)
-		room = NewRoom(id, h.Publisher, h.Subscriber)
+		room = NewRoom(id, h.Publisher, h.Subscriber, h.EventBus)
 		h.Rooms[id] = room
 		go room.Run(h.Subscriber)
 		log.Printf("Room %s created and started", id)

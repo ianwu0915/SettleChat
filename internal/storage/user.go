@@ -92,11 +92,11 @@ func (p *PostgresStore) UpdateLastActive(ctx context.Context, userID string) err
 }
 
 func (p *PostgresStore) UpdatePresence(ctx context.Context, roomID, userID string, isOnline bool) error {
-    _, err := p.DB.Exec(ctx, `
+	_, err := p.DB.Exec(ctx, `
         INSERT INTO user_presence (room_id, user_id, is_online, last_seen)
         VALUES ($1, $2, $3, NOW())
         ON CONFLICT (room_id, user_id) 
         DO UPDATE SET is_online = $3, last_seen = NOW()
     `, roomID, userID, isOnline)
-    return err
+	return err
 }

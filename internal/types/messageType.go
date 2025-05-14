@@ -6,15 +6,6 @@ import (
 	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
-type ChatMessage struct {
-	ID        int       `json:"-"` // 不 expose 給前端
-	RoomID    string    `json:"room_id"`
-	SenderID  string    `json:"sender_id"`
-	Sender    string    `json:"sender"`
-	Content   string    `json:"content"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
 // UserJoinedMessage 用戶加入消息
 type UserJoinedMessage struct {
 	RoomID   string    `json:"room_id"`
@@ -55,6 +46,6 @@ type HistoryRequest struct {
 
 // HistoryResponse 歷史消息響應
 type HistoryResponse struct {
-	RoomID   string        `json:"room_id"`
+	RoomID   string                `json:"room_id"`
 	Messages []storage.ChatMessage `json:"messages"`
-} 
+}

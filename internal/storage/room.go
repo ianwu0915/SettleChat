@@ -2,7 +2,7 @@ package storage
 
 import (
 	"context"
-	"fmt"
+	// "fmt"
 	"log"
 	"time"
 
@@ -13,13 +13,13 @@ func (p *PostgresStore) CreateRoom(ctx context.Context, name, createdBy string) 
 
 	// Check if the room exist or not
 	var existingID string
-	
+
 	err := p.DB.QueryRow(ctx, `SELECT id FROM rooms WHERE roomname = $1`, name).Scan(&existingID)
 	if err == nil {
 		log.Printf("Room already exists: %s", existingID)
 		return existingID, nil
 	}
-	
+
 	roomID := uuid.NewString()
 	log.Printf("Creating room: ID=%s, Name=%s, CreatedBy=%s", roomID, name, createdBy)
 
@@ -86,17 +86,17 @@ func (p *PostgresStore) GetUserRooms(ctx context.Context, userID string) ([]Room
 
 // RemoveUserFromRoom 從房間中移除用戶
 func (p *PostgresStore) RemoveUserFromRoom(ctx context.Context, userID, roomID string) error {
-	// 從 user_rooms 表中刪除記錄
-	_, err := p.DB.Exec(ctx, `
-		DELETE FROM user_rooms 
-		WHERE user_id = $1 AND room_id = $2
-	`, userID, roomID)
-	if err != nil {
-		return fmt.Errorf("failed to remove user from room: %w", err)
-	}
+	// 從 room_members 表中刪除記錄
+	// _, err := p.DB.Exec(ctx, `
+	// 	DELETE FROM room_members
+	// 	WHERE user_id = $1 AND room_id = $2
+	// `, userID, roomID)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to remove user from room: %w", err)
+	// }
 
 	// 更新用戶在線狀態為離線
-	_, err = p.DB.Exec(ctx, `
+	_, err := p.DB.Exec(ctx, `
 		UPDATE user_presence 
 		SET is_online = false, last_seen = NOW()
 		WHERE user_id = $1 AND room_id = $2

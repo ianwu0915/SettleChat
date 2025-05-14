@@ -12,11 +12,10 @@ import (
 
 	"github.com/ianwu0915/SettleChat/cmd/server/handler"
 	"github.com/ianwu0915/SettleChat/internal/chat"
-	"github.com/ianwu0915/SettleChat/internal/handlers"
-	"github.com/ianwu0915/SettleChat/internal/messaging"
+	handlers "github.com/ianwu0915/SettleChat/internal/event_handlers"
+	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/ianwu0915/SettleChat/internal/types"
-	"github.com/ianwu0915/SettleChat/internal/ws"
 	"github.com/joho/godotenv"
 	"github.com/nats-io/nats.go"
 )
@@ -60,8 +59,11 @@ func main() {
 	// 5. 創建發布器
 	publisher := messaging.NewPublisher(natsManager, env, topics)
 
+	// 5.1 創建事件總線
+	eventBus := messaging.NewEventBus(natsManager, topics)
+
 	// 6. 創建 Hub
-	hub := chat.NewHub(store, publisher, nil, topics)
+	hub := chat.NewHub(store, publisher, nil, topics, eventBus)
 	go hub.Run()
 
 	// 7. 創建消息處理器
@@ -76,7 +78,7 @@ func main() {
 
 	// 9. 創建 HTTP 處理器
 	authHandler := handler.NewAuthHandler(store)
-	roomHandler := handler.NewRoomHandler(store, publisher, env)
+	roomHandler := handler.NewRoomHandler(store, publisher, env, eventBus)
 
 	// 10. 設置路由
 	mux := http.NewServeMux()
@@ -100,8 +102,8 @@ func main() {
 
 // initializeHandlers 初始化所有消息處理器
 func initializeHandlers(store *storage.PostgresStore, publisher types.NATSPublisher, topics types.TopicFormatter, env string, hub *chat.Hub) map[string]types.MessageHandler {
+
 	handlers_list := make(map[string]types.MessageHandler)
-	
 	handlers_list["user.joined"] = handlers.NewUserJoinedHandler(store, publisher, topics, env)
 	handlers_list["user.left"] = handlers.NewUserLeftHandler(store, publisher, topics, env)
 	handlers_list["user.presence"] = handlers.NewPresenceHandler(store, topics, env)
@@ -110,7 +112,8 @@ func initializeHandlers(store *storage.PostgresStore, publisher types.NATSPublis
 	handlers_list["message.history.response"] = handlers.NewHistoryResponseHandler(hub)
 	handlers_list["message.broadcast"] = handlers.NewBroadcastHandler(hub)
 	handlers_list["system.message"] = handlers.NewSystemMessageHandler(publisher, topics, env)
-	
+	handlers_list["connection.event"] = handlers.NewConnectionEventHandler(store, publisher, topics)
+
 	return handlers_list
 }
 
@@ -126,7 +129,7 @@ func registerHandlers(subscriber *messaging.Subscriber, handlers map[string]type
 
 // setupRoutes 設置 HTTP 路由
 func setupRoutes(mux *http.ServeMux, hub *chat.Hub, auth *handler.AuthHandler, room *handler.RoomHandler) {
-	mux.HandleFunc("/ws", ws.WebsocketHandler(hub))
+	mux.HandleFunc("/ws", handler.WebsocketHandler(hub))
 	mux.Handle("/register", http.HandlerFunc(auth.Register))
 	mux.Handle("/login", http.HandlerFunc(auth.Login))
 	mux.Handle("/user", http.HandlerFunc(auth.GetUserByID))
@@ -148,7 +151,7 @@ func gracefulShutdown(server *http.Server, hub *chat.Hub, subscriber *messaging.
 	// 1. 停止接受新的 HTTP 請求
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}

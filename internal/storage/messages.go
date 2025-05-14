@@ -44,4 +44,4 @@ type HistoryRequest struct {
 type HistoryResponse struct {
 	RoomID   string        `json:"room_id"`
 	Messages []ChatMessage `json:"messages"`
-} 
+}
