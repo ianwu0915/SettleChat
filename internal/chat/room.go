@@ -1,13 +1,9 @@
 package chat
 
 import (
-	"encoding/json"
 	"log"
 	"sync"
-	"time"
-
 	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
-	"github.com/ianwu0915/SettleChat/internal/types"
 )
 
 // What we do in Room: Fire a GoRoutine
@@ -61,22 +57,6 @@ func (r *Room) AddClient(client *Client) {
 		} else {
 			log.Printf("新方法：Published client connection event for %s in room %s", client.Username, r.ID)
 		}
-		// } else {
-		// 	// 兼容舊的方式，如果 EventBus 尚未設置
-		// 	log.Println("舊方法")
-		// 	connectionData, _ := json.Marshal(map[string]interface{}{
-		// 		"room_id":    r.ID,
-		// 		"user_id":    client.ID,
-		// 		"username":   client.Username,
-		// 		"timestamp":  time.Now(),
-		// 		"event_type": "connect",
-		// 	})
-		// 	connectionTopic := r.Subscriber.Topics.GetConnectionTopic(r.ID)
-		// 	if err := r.Publisher.Publish(connectionTopic, connectionData); err != nil {
-		// 		log.Printf("Failed to publish client connection event: %v", err)
-		// 	} else {
-		// 		log.Printf("Published client connection event for %s in room %s", client.ID, r.ID)
-		// 	}
 	}
 
 	// 3. 發布歷史消息請求事件
@@ -86,57 +66,9 @@ func (r *Room) AddClient(client *Client) {
 		} else {
 			log.Printf("新歷史消息方法：Successfully sent history request for client %s in room %s", client.ID, r.ID)
 		}
-		// } else {
-		// 	// 兼容舊的方式
-		// 	log.Println("舊歷史方法")
-		// 	historyRequest := types.HistoryRequest{
-		// 		RoomID: r.ID,
-		// 		UserID: client.ID,
-		// 		Limit:  50,
-		// 	}
-		// 	data, err := json.Marshal(historyRequest)
-		// 	if err != nil {
-		// 		log.Printf("Failed to marshal history request: %v", err)
-		// 	} else {
-		// 		requestTopic := r.Subscriber.Topics.GetHistoryRequestTopic(r.ID)
-		// 		log.Printf("Sending history request to topic: %s", requestTopic)
-		// 		if err := r.Publisher.Publish(requestTopic, data); err != nil {
-		// 			log.Printf("Failed to request history messages: %v", err)
-		// 		} else {
-		// 			log.Printf("Successfully sent history request for client %s in room %s", client.ID, r.ID)
-		// 		}
-		// 	}
 	}
 
-	// 4. 發布用戶加入事件 (使用 EventBus)
-	if r.EventBus != nil {
-		if err := r.EventBus.PublishUserJoinedEvent(r.ID, client.ID, client.Username); err != nil {
-			log.Printf("Failed to publish user joined event: %v", err)
-		} else {
-			log.Printf("Published user joined event for client %s in room %s", client.ID, r.ID)
-		}
-		// } else {
-		// 	// 兼容舊的方式，如果 EventBus 尚未設置
-		// 	userJoinedData := types.UserJoinedMessage{
-		// 		RoomID:   r.ID,
-		// 		UserID:   client.ID,
-		// 		Username: client.Username,
-		// 		JoinedAt: time.Now(),
-		// 	}
-		// 	joinedData, err := json.Marshal(userJoinedData)
-		// 	if err != nil {
-		// 		log.Printf("Failed to marshal user joined event: %v", err)
-		// 	} else {
-		// 		joinedTopic := r.Subscriber.Topics.GetUserJoinedTopic(r.ID)
-		// 		if err := r.Publisher.Publish(joinedTopic, joinedData); err != nil {
-		// 			log.Printf("Failed to publish user joined event: %v", err)
-		// 		} else {
-		// 			log.Printf("Published user joined event for client %s in room %s", client.ID, r.ID)
-		// 		}
-		// 	}
-	}
-
-	// 注意：不再直接發布在線狀態事件，這將由 UserJoinedHandler 處理
+	// 注意：不再直接發布用戶加入事件，這將由 JoinRoom API 處理
 }
 
 func (r *Room) SaveRemoveClient(client *Client) {
@@ -152,56 +84,9 @@ func (r *Room) SaveRemoveClient(client *Client) {
 			} else {
 				log.Printf("Published client disconnect event for %s in room %s", client.ID, r.ID)
 			}
-		} else {
-			// 兼容舊的方式
-			log.Println("依然使用舊斷開連結方法")
-			disconnectData, _ := json.Marshal(map[string]interface{}{
-				"room_id":    r.ID,
-				"user_id":    client.ID,
-				"username":   client.Username,
-				"timestamp":  time.Now(),
-				"event_type": "disconnect",
-			})
-			disconnectTopic := r.Subscriber.Topics.GetConnectionTopic(r.ID)
-			if err := r.Publisher.Publish(disconnectTopic, disconnectData); err != nil {
-				log.Printf("Failed to publish client disconnect event: %v", err)
-			} else {
-				log.Printf("Published client disconnect event for %s in room %s", client.ID, r.ID)
-			}
 		}
 
-		// 2. 發布用戶離開事件
-		if r.EventBus != nil {
-			if err := r.EventBus.PublishUserLeftEvent(r.ID, client.ID, client.Username); err != nil {
-				log.Printf("Failed to publish user left event: %v", err)
-			} else {
-				log.Printf("Published user left event for client %s in room %s", client.ID, r.ID)
-			}
-		} else {
-			// 兼容舊的方式
-			log.Println("依然使用舊用戶離開方法")
-			userLeftData := types.UserLeftMessage{
-				RoomID:   r.ID,
-				UserID:   client.ID,
-				Username: client.Username,
-				LeftAt:   time.Now(),
-			}
-			leftData, err := json.Marshal(userLeftData)
-			if err != nil {
-				log.Printf("Failed to marshal user left event: %v", err)
-			} else {
-				leftTopic := r.Subscriber.Topics.GetUserLeftTopic(r.ID)
-				if err := r.Publisher.Publish(leftTopic, leftData); err != nil {
-					log.Printf("Failed to publish user left event: %v", err)
-				} else {
-					log.Printf("Published user left event for client %s in room %s", client.ID, r.ID)
-				}
-			}
-		}
-
-		// 注意：不再直接發布離線狀態事件，這將由 UserLeftHandler 處理
-
-		// 3. 取消訂閱歷史消息響應主題
+		// 2. 取消訂閱歷史消息響應主題
 		if r.Subscriber != nil {
 			historyResponseTopic := r.Subscriber.Topics.GetHistoryResponseTopic(r.ID, client.ID)
 			log.Printf("Unsubscribing from history response topic: %s", historyResponseTopic)
