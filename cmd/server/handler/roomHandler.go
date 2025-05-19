@@ -75,11 +75,7 @@ func (h *RoomHandler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// // 發布用戶加入事件
-	// if err := h.publisher.PublishUserJoined(rid, req.UserID, user.UserName); err != nil {
-	// 	log.Printf("Failed to publish user joined event: %v", err)
-	// }
-
+	// Return {"room_id:" "lkahld "}
 	json.NewEncoder(w).Encode(map[string]string{"room_id": rid}) //?
 }
 
@@ -93,29 +89,6 @@ func (h *RoomHandler) JoinRoom(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-
-	// // 發布用戶加入請求事件
-	// data, err := json.Marshal(map[string]interface{}{
-	// 	"room_id":    req.RoomID,
-	// 	"user_id":    req.UserID,
-	// 	"username":   req.Username,
-	// 	"timestamp":  time.Now(),
-	// 	"event_type": "join_request",
-	// // })
-	// if err != nil {
-	// 	log.Printf("Failed to marshal join request: %v", err)
-	// 	http.Error(w, "internal server error", http.StatusInternalServerError)
-	// 	return
-	// }
-
-	// // 使用系統消息主題發布加入請求事件
-	// // 注意：理想情況下應該有專門的 join.request 主題
-	// topic := h.publisher.GetTopics().GetSystemMessageTopic(req.RoomID)
-	// if err := h.publisher.Publish(topic, data); err != nil {
-	// 	log.Printf("Failed to publish join request: %v", err)
-	// 	http.Error(w, "internal server error", http.StatusInternalServerError)
-	// 	return
-	// }
 
 	if h.EventBus != nil {
 		if err := h.EventBus.PublishUserJoinedEvent(req.RoomID, req.UserID, req.Username); err != nil {
@@ -153,12 +126,6 @@ func (h *RoomHandler) LeaveRoom(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 發布用戶離開事件
-	// if err := h.publisher.PublishUserLeft(req.RoomID, req.UserID, user.UserName); err != nil {
-	// 	log.Printf("Failed to publish user left event: %v", err)
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
 
 	w.WriteHeader(http.StatusOK)
 }

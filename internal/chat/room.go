@@ -68,7 +68,6 @@ func (r *Room) AddClient(client *Client) {
 		}
 	}
 
-	// 注意：不再直接發布用戶加入事件，這將由 JoinRoom API 處理
 }
 
 func (r *Room) SaveRemoveClient(client *Client) {
