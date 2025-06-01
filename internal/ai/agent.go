@@ -57,7 +57,6 @@ func (a *Agent) registerCommands() {
 	a.commandMap[CommandTypeStats] = a.HandleStatsCommand
 	a.commandMap[CommandTypeClear] = a.HandleClearCommand
 	a.commandMap[CommandTypePrompt] = a.HandlePromptCommand
-
 }
 
 

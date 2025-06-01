@@ -70,12 +70,13 @@ func main() {
 	mockProvider := ai.NewMockProvider("test_provider")
 	aiManager := ai.NewManager(store, mockProvider, eventBus)
 
-	// 7. 創建消息處理器
-	messageHandlers := initializeHandlers(store, publisher, topics, env, hub, aiManager)
+	// 7. 創建消息處理器：將所有種類的消息處理器都加到對應的topics下： map[string]types.MessageHandler
+	// "user.joined" : userJoinHandler
+	allEventHandlerList := initializeHandlers(store, publisher, topics, env, hub, aiManager)
 
-	// 8. 創建並初始化訂閱器
+	// 8. 創建並初始化訂閱器 + 這操ㄙㄛ
 	subscriber := messaging.NewSubscriber(natsManager, store, env, topics)
-	registerHandlers(subscriber, messageHandlers)
+	registerHandlers(subscriber, allEventHandlerList)
 
 	// 設置 Hub 的訂閱器
 	hub.Subscriber = subscriber
@@ -122,7 +123,7 @@ func initializeHandlers(store *storage.PostgresStore, publisher types.NATSPublis
 	return handlers_list
 }
 
-// registerHandlers 註冊所有處理器到訂閱器
+// registerHandlers 註冊所有處理器到NATS訂閱器
 func registerHandlers(subscriber *messaging.Subscriber, handlers map[string]types.MessageHandler) {
 	for topic, handler := range handlers {
 		parts := strings.Split(topic, ".")

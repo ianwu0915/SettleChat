@@ -170,6 +170,18 @@ func parseTopic(topic string) []string {
 	parts := strings.Split(topic, ".")
 	log.Printf("Parsed topic %s into %d parts", topic, len(parts))
 
+	// 處理 AI 命令主題
+	if len(parts) >= 3 && parts[0] == "ai" && parts[1] == "command" {
+		// 將 ai.command 作為一個完整的 action
+		newParts := make([]string, 0)
+		newParts = append(newParts, "settlechat") // 基礎前綴
+		newParts = append(newParts, "ai")         // category
+		newParts = append(newParts, "command")    // action
+		newParts = append(newParts, parts[2:]...) // roomID 等其他部分
+		log.Printf("Reformatted AI command topic parts: %v", newParts)
+		return newParts
+	}
+
 	// 如果是歷史消息相關主題，需要特殊處理
 	if len(parts) >= 4 && parts[1] == "message" {
 		if parts[2] == "history" && parts[3] == "request" {

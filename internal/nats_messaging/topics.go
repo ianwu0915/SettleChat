@@ -67,5 +67,5 @@ func (t *TopicFormatter) GetConnectionTopic(roomID string) string {
 
 // GetAICommandTopic 獲取 AI 命令主題
 func (t *TopicFormatter) GetAICommandTopic(roomID string) string {
-	return fmt.Sprintf("ai.command.%s", roomID)
+	return t.formatTopic("ai", "command", roomID)
 }

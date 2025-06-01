@@ -17,7 +17,6 @@ type Manager struct {
 	store *storage.PostgresStore
 	provider Provider
 	eventBus *messaging.EventBus
-	subscriber *messaging.Subscriber
 	mu sync.RWMutex
 
 	config ManagerConfig 
@@ -70,6 +69,7 @@ func NewManager(store *storage.PostgresStore, provider Provider, eventBus *messa
 		store: store,
 		eventBus: eventBus,
 		config: config,
+		provider: provider,
 	}
 
 	// Start the cleanup goroutine
@@ -138,11 +138,11 @@ func (m *Manager) HandleAIMessage(ctx context.Context, msg storage.ChatMessage) 
 	}
 
 	// 3. 獲取對應的 Agent 並處理
-	agent := m.GetAgent(msg.RoomID)
+	agent := m.GetOrCreateAgent(msg.RoomID)
 	return agent.HandleAIMessage(ctx, aiMsg)
 }
 
-func (m *Manager) GetAgent(roomID string) *Agent {
+func (m *Manager) GetOrCreateAgent(roomID string) *Agent {
 	m.mu.RLock()
 	agent, exist := m.agents[roomID]
 	m.mu.RUnlock()
