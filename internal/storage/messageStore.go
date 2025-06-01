@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"time"
 )
 
 func (p *PostgresStore) SaveMessage(ctx context.Context, msg ChatMessage) error {
@@ -44,3 +45,31 @@ func (p *PostgresStore) GetRecentMessages(ctx context.Context, roomId string, li
 
 	return messages, nil
 }
+
+func (p *PostgresStore) GetMessagesByTimeRange(ctx context.Context, roomID string, startTime, endTime time.Time) ([]ChatMessage, error) {
+	rows, err := p.DB.Query(ctx, `
+		SELECT id, room_id, sender_id, sender, content, timestamp 
+		FROM messages 
+		WHERE room_id = $1 
+		AND timestamp BETWEEN $2 AND $3
+		ORDER BY timestamp ASC
+	`, roomID, startTime, endTime)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []ChatMessage
+	for rows.Next() {
+		var msg ChatMessage
+		if err := rows.Scan(&msg.ID, &msg.RoomID, &msg.SenderID, &msg.Sender, &msg.Content, &msg.Timestamp); err != nil {
+			return nil, err
+		}
+		messages = append(messages, msg)
+	}
+
+	return messages, nil
+}
+
+

@@ -1,0 +1,36 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# API Endpoints
+
+## WebSocket
+- `/ws`: WebSocket connection endpoint for real-time chat
+
+## Authentication
+- `/register`: Register a new user
+- `/login`: User login
+- `/user`: Get user information by ID
+
+## Room Management
+- `/rooms/create`: Create a new chat room
+- `/rooms/join`: Join an existing chat room
+- `/rooms/leave`: Leave a chat room
+- `/rooms`: Get list of rooms for the current user
+
+## Static Files
+- `/`: Serves static files from the `web` directory
+
+## Implementation
+The API endpoints are implemented in [cmd/server/handler/](mdc:cmd/server/handler) with:
+- `AuthHandler`: Handles authentication endpoints
+- `RoomHandler`: Manages room-related operations
+- `WebsocketHandler`: Handles WebSocket connections
+
+## Request Flow
+1. HTTP requests are routed through the main server
+2. Handlers process the requests and interact with:
+   - Storage layer for persistence
+   - NATS for message distribution
+   - Hub for WebSocket connections

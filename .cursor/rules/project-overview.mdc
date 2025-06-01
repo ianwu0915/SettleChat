@@ -1,0 +1,38 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# SettleChat Project Overview
+
+SettleChat is a real-time chat application built in Go with WebSocket support and NATS messaging system.
+
+## Core Components
+
+### Entry Point
+The main application entry point is [cmd/server/main.go](mdc:cmd/server/main.go), which initializes all core components and starts the HTTP server.
+
+### Key Directories
+- `cmd/server/`: Contains the main application entry point
+- `internal/`: Core application logic
+  - `ws/`: WebSocket handlers and connection management
+  - `chat/`: Chatroom, Client, and Hub implementations
+  - `ai/`: AI integration (DeepSeek, OpenAI)
+  - `storage/`: Message persistence (SQLite)
+  - `command/`: Command processing logic
+  - `utils/`: Utility functions
+- `web/`: Static assets and frontend build output
+
+### Main Features
+1. Real-time chat using WebSocket
+2. Message persistence with PostgreSQL
+3. NATS messaging for distributed communication
+4. User authentication and room management
+5. AI integration capabilities
+
+### Architecture
+The application uses a hub-based architecture where:
+1. The Hub manages WebSocket connections
+2. NATS handles message distribution
+3. PostgreSQL stores persistent data
+4. HTTP endpoints handle REST operations

@@ -1,0 +1,39 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Chat System Architecture
+
+## Core Components
+
+### Hub
+The Hub ([internal/chat/hub.go](mdc:internal/chat/hub.go)) is the central component that:
+- Manages WebSocket connections
+- Broadcasts messages to connected clients
+- Handles client registration and unregistration
+
+### Message Flow
+1. Client connects via WebSocket
+2. Messages are processed through NATS topics:
+   - `user.joined`: When a user joins a room
+   - `user.left`: When a user leaves a room
+   - `message.chat`: Regular chat messages
+   - `message.history.request`: Request for chat history
+   - `message.history.response`: Response with chat history
+   - `message.broadcast`: System-wide broadcasts
+   - `system.message`: System notifications
+   - `connection.event`: Connection status updates
+
+### Message Handlers
+Message handlers are defined in [internal/event_handlers/](mdc:internal/event_handlers) and include:
+- UserJoinedHandler
+- UserLeftHandler
+- ChatMessageHandler
+- HistoryHandler
+- BroadcastHandler
+- SystemMessageHandler
+- ConnectionEventHandler
+
+### Storage
+Messages are persisted using PostgreSQL through the storage package ([internal/storage/](mdc:internal/storage)).
