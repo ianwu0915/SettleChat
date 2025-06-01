@@ -64,3 +64,8 @@ func (t *TopicFormatter) GetHistoryResponseTopic(roomID, userID string) string {
 func (t *TopicFormatter) GetConnectionTopic(roomID string) string {
 	return t.formatTopic("connection", "event", roomID)
 }
+
+// GetAICommandTopic 獲取 AI 命令主題
+func (t *TopicFormatter) GetAICommandTopic(roomID string) string {
+	return fmt.Sprintf("ai.command.%s", roomID)
+}

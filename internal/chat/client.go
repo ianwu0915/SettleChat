@@ -2,6 +2,7 @@ package chat
 
 import (
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -122,32 +123,32 @@ func (c *Client) ReadPump() {
 			continue
 		}
 
-		log.Printf("[%s] %s: %s ", c.ID, c.Username, msg.Content)
+		// 補上消息的其他字段
+		msg.RoomID = c.RoomID
+		msg.SenderID = c.ID
+		msg.Sender = c.Username
+		msg.Timestamp = time.Now()
 
-		// 補上其他field
-		// msg.RoomID = c.RoomID
-		// msg.SenderID = c.ID
-		// msg.Sender = c.Username
-		// msg.Timestamp = time.Now()
-
-		// 每次收到消息，重設讀取截止時間
-		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
-
-		// 發佈新消息傳送事件（使用eventbus)
-		if c.EventBus != nil {
-			if err := c.EventBus.PublishNewMessageEvent(c.RoomID, c.ID, c.Username, msg.Content); err != nil {
-				log.Printf("Failed to publish New Message event: %v", err)
-			} else {
-				log.Printf("Published NewMessage event for %s in room %s", c.Username, c.RoomID)
+		// 先檢查是否是 AI 命令
+		if strings.HasPrefix(msg.Content, "/") {
+			// 發布 AI 命令事件
+			if c.EventBus != nil {
+				if err := c.EventBus.PublishAICommandEvent(msg); err != nil {
+					log.Printf("Failed to publish AI command event: %v", err)
+				} else {
+					log.Printf("Published AI command event for %s in room %s", c.Username, c.RoomID)
+				}
 			}
 		} else {
-			log.Printf("EventBus is nil!!")
+			// 不是AI命令：發布普通消息事件
+			if c.EventBus != nil {
+				if err := c.EventBus.PublishNewMessageEvent(c.RoomID, c.ID, c.Username, msg.Content); err != nil {
+					log.Printf("Failed to publish New Message event: %v", err)
+				}
+			}
 		}
 
-		// if err := c.Hub.Publisher.PublishMessage(msg); err != nil {
-		// 	log.Printf("Failed to publish message: %v", err)
-		// 	continue
-		// }
-
+		// Rest Conn ReadDealLine 
+		c.Conn.SetReadDeadline(time.Now().Add(pongWait))
 	}
 }

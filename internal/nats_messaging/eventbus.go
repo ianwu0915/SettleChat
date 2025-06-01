@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
+	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/ianwu0915/SettleChat/internal/types"
 )
 
@@ -120,13 +122,44 @@ func (eb *EventBus) PublishPresenceEvent(roomID, userID, username string, isOnli
 }
 
 // PublishNewMessageEvent 發布新訊息事件
-func (eb *EventBus) PublishNewMessageEvent(roomID, userID, username, content string) error {
-	event := types.NewChatMessageEvent(roomID, userID, username, content)
-	return eb.PublishEvent(event, roomID)
+func (eb *EventBus) PublishNewMessageEvent(roomID, senderID, sender, content string) error {
+	event := types.ChatMessageEvent{
+		RoomID:    roomID,
+		SenderID:  senderID,
+		Sender:    sender,
+		Content:   content,
+		Timestamp: time.Now(),
+	}
+
+	data, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message event: %w", err)
+	}
+
+	topic := eb.topics.GetMessageTopic(roomID)
+	return eb.natsManager.Publish(topic, data)
 }
 
 // PublishHistoryRequestEvent 發布歷史消息請求事件
 func (eb *EventBus) PublishHistoryRequestEvent(roomID, userID string, limit int) error {
 	event := types.NewHistoryRequestEvent(roomID, userID, limit)
 	return eb.PublishEvent(event, roomID)
+}
+
+// PublishAICommandEvent 發布 AI 命令事件
+func (eb *EventBus) PublishAICommandEvent(msg storage.ChatMessage) error {
+	// 創建 AI 命令事件
+	event := types.AICommandEvent{
+		ChatMessage: msg,
+		Timestamp:   time.Now(),
+	}
+
+	data, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("failed to marshal AI command event: %w", err)
+	}
+
+	// 發布到 AI 命令主題
+	topic := eb.topics.GetAICommandTopic(msg.RoomID)
+	return eb.natsManager.Publish(topic, data)
 }
