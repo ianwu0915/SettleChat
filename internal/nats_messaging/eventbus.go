@@ -74,6 +74,10 @@ func (eb *EventBus) getTopicForEvent(event types.Event, roomID string) string {
 		return eb.topics.GetBroadcastTopic(roomID)
 	}
 
+	if eventType == types.EventTypeNewAICommand {
+		return eb.topics.GetAICommandTopic(roomID)
+	}
+
 	// HistoryRequest + HistoryResponse
 	if strings.HasPrefix(eventType, "message.history") {
 		// 歷史消息請求和響應使用不同的主題
@@ -149,17 +153,8 @@ func (eb *EventBus) PublishHistoryRequestEvent(roomID, userID string, limit int)
 // PublishAICommandEvent 發布 AI 命令事件
 func (eb *EventBus) PublishAICommandEvent(msg storage.ChatMessage) error {
 	// 創建 AI 命令事件
-	event := types.AICommandEvent{
-		ChatMessage: msg,
-		Timestamp:   time.Now(),
-	}
-
-	data, err := json.Marshal(event)
-	if err != nil {
-		return fmt.Errorf("failed to marshal AI command event: %w", err)
-	}
-
-	// 發布到 AI 命令主題
-	topic := eb.topics.GetAICommandTopic(msg.RoomID)
-	return eb.natsManager.Publish(topic, data)
+	event := types.NewAICommandEvent(&msg)
+	return eb.PublishEvent(event, msg.RoomID)
+	
 }
+ 

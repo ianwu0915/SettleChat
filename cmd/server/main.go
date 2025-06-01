@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ianwu0915/SettleChat/cmd/server/handler"
+	"github.com/ianwu0915/SettleChat/internal/ai"
 	"github.com/ianwu0915/SettleChat/internal/chat"
 	handlers "github.com/ianwu0915/SettleChat/internal/event_handlers"
 	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
@@ -66,8 +67,11 @@ func main() {
 	hub := chat.NewHub(store, publisher, nil, topics, eventBus)
 	go hub.Run()
 
+	mockProvider := ai.NewMockProvider("test_provider")
+	aiManager := ai.NewManager(store, mockProvider, eventBus)
+
 	// 7. 創建消息處理器
-	messageHandlers := initializeHandlers(store, publisher, topics, env, hub)
+	messageHandlers := initializeHandlers(store, publisher, topics, env, hub, aiManager)
 
 	// 8. 創建並初始化訂閱器
 	subscriber := messaging.NewSubscriber(natsManager, store, env, topics)
@@ -101,7 +105,7 @@ func main() {
 }
 
 // initializeHandlers 初始化所有消息處理器
-func initializeHandlers(store *storage.PostgresStore, publisher types.NATSPublisher, topics types.TopicFormatter, env string, hub *chat.Hub) map[string]types.MessageHandler {
+func initializeHandlers(store *storage.PostgresStore, publisher types.NATSPublisher, topics types.TopicFormatter, env string, hub *chat.Hub, aiManager *ai.Manager) map[string]types.MessageHandler {
 
 	handlers_list := make(map[string]types.MessageHandler)
 	handlers_list["user.joined"] = handlers.NewUserJoinedHandler(store, publisher, topics, env)
@@ -113,6 +117,7 @@ func initializeHandlers(store *storage.PostgresStore, publisher types.NATSPublis
 	handlers_list["message.broadcast"] = handlers.NewBroadcastHandler(hub)
 	handlers_list["system.message"] = handlers.NewSystemMessageHandler(publisher, topics, env)
 	handlers_list["connection.event"] = handlers.NewConnectionEventHandler(store, publisher, topics)
+	handlers_list["ai.command"] = handlers.NewAICommandHandler(publisher, topics, env, aiManager)
 
 	return handlers_list
 }

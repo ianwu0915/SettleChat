@@ -31,8 +31,7 @@ func NewChatMessageHandler(store *storage.PostgresStore, publisher types.NATSPub
 	}
 }
 
-// 可以在這邊攔截Message是否是AI command
-// 是的話 Publish AICommandEvent到Eventbus 然後處理
+
 func (h *ChatMessageHandler) Handle(msg *nats.Msg) error {
 	// 先嘗試解析為 types.ChatMessageEvent
 	var event types.ChatMessageEvent

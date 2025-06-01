@@ -110,7 +110,17 @@ func (s *Subscriber) SubscribeToRoom(roomID string) error {
 		return err
 	}
 
+	// 訂閱ai command事件
+	aicommandTopic := s.Topics.GetAICommandTopic(roomID)
+	log.Printf("Subscribing to AI command event topic: %s", aicommandTopic)
+	if err := s.SubscribeTopic(aicommandTopic); err != nil {
+		log.Printf("Failed to subscribe to ai command topic: %v", err)
+		return err
+	}
+
+
 	log.Printf("Successfully subscribed to all topics for room: %s", roomID)
+
 	return nil
 }
 

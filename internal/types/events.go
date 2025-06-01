@@ -2,6 +2,8 @@ package types
 
 import (
 	"time"
+
+	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
 // Event 是所有事件的基本介面
@@ -53,6 +55,10 @@ const (
 	EventTypeNewMessage     = "message.new"
 	EventTypeBroadcastMsg   = "message.broadcast"
 	EventTypeMessageHistory = "message.history"
+
+	// AI命令	
+	EventTypeNewAICommand 	= "ai.command"
+
 )
 
 // ConnectionEvent 連接事件
@@ -168,5 +174,20 @@ func NewHistoryRequestEvent(roomID, userID string, limit int) HistoryRequestEven
 		RoomID:    roomID,
 		UserID:    userID,
 		Limit:     limit,
+	}
+}
+
+// AICommandEvent AI 命令事件
+type AICommandEvent struct {
+	BaseEvent
+	Message *storage.ChatMessage
+	Timestamp time.Time `json:"timestamp"`
+}
+
+func NewAICommandEvent(msg *storage.ChatMessage) AICommandEvent {
+	return AICommandEvent{
+		BaseEvent: NewBaseEvent(EventTypeNewAICommand),
+		Message: msg,
+		Timestamp: time.Now(),
 	}
 }

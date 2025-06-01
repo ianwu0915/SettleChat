@@ -49,3 +49,7 @@ type HistoryResponse struct {
 	RoomID   string                `json:"room_id"`
 	Messages []storage.ChatMessage `json:"messages"`
 }
+
+type AICommand struct {
+	
+}
