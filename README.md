@@ -1,464 +1,435 @@
 # SettleChat
 
-SettleChat is a real-time chat system based on WebSocket and NATS, featuring AI-assisted functionality.
+> **AI-Driven Real-Time Collaboration Platform**  
+> Intelligent chat system with event-driven architecture, WebSocket communication, and AI-powered conversation assistance.
 
-## System Architecture
+[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org)
+[![NATS](https://img.shields.io/badge/messaging-NATS-green.svg)](https://nats.io)
+[![PostgreSQL](https://img.shields.io/badge/database-PostgreSQL-blue.svg)](https://postgresql.org)
+[![Docker](https://img.shields.io/badge/deployment-Docker-blue.svg)](https://docker.com)
 
-### High-Level System Design
+## 🚀 Overview
+
+SettleChat is a modern, scalable real-time chat application that combines traditional messaging with AI-powered collaboration features. Built with Go's performance and NATS' distributed messaging capabilities, it provides intelligent conversation assistance, automatic summarization, and seamless team collaboration tools.
+
+### ✨ Key Features
+
+- **🔄 Real-Time Communication**: WebSocket-based messaging with automatic reconnection
+- **🤖 AI-Powered Assistance**: Intelligent conversation summaries, command processing, and collaboration insights
+- **📡 Event-Driven Architecture**: NATS-based message distribution for high scalability
+- **🏠 Multi-Room Support**: Create and manage multiple chat rooms with persistent history
+- **👥 User Management**: Secure authentication with bcrypt encryption
+- **💾 Data Persistence**: PostgreSQL storage with optimized indexing for chat history
+- **📈 Performance Monitoring**: Built-in benchmarking and performance testing
+- **🐳 Container Ready**: Full Docker Compose setup for easy deployment
+
+## 🏗️ Architecture
+
+### System Design
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  WebSocket  │     │   EventBus  │     │    NATS     │
-│   Server    │◄───►│    Layer    │◄───►│   Broker    │
-└─────────────┘     └─────────────┘     └─────────────┘
-       ▲                    ▲                   ▲
-       │                    │                   │
-       ▼                    ▼                   ▼
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│    Chat     │     │     AI      │     │  Storage    │
-│   Module    │     │   Module    │     │   Module    │
-└─────────────┘     └─────────────┘     └─────────────┘
+┌─────────────────┐
+│  Frontend       │
+│  (WebSocket)    │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│  Chat Module    │
+│ (Hub/Room/Client)│
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│   EventBus      │
+│  (Abstraction)  │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│     NATS        │
+│  (Messaging)    │
+└─────────┬───────┘
+          │
+          ▼
+┌─────────────────┐
+│ Event Handlers  │
+│ (Business Logic)│
+└───────┬─────────┘
+        │
+    ┌───▼───┐
+    │       │
+    ▼       ▼
+┌─────┐   ┌─────────┐
+│ AI  │   │ Storage │
+│Module│   │ Module  │
+└─────┘   └─────────┘
 ```
 
-### HTTP Handlers
+### Layered Architecture
 
-#### Authentication Handlers (cmd/server/handler/authHandlers.go)
+#### 🎯 EventBus Layer (Abstraction)
 
-- **User Registration**
+- **Purpose**: Unified event publishing interface that abstracts underlying messaging system
+- **Location**: `internal/messaging/eventbus.go`
+- **Key Methods**:
+  - `PublishEvent()` - Routes events to appropriate NATS topics
+  - `PublishUserJoinedEvent()`, `PublishAICommandEvent()` - Typed event publishers
+- **Benefits**: Decouples business logic from NATS, enables easy testing and message system swapping
 
-  - Endpoint: `POST /api/auth/register`
-  - Functionality: Create new user account
-  - Request Body: `{ "username": string, "password": string }`
-  - Response: JWT token and user info
+#### 🚀 NATS Layer (Implementation)
 
-- **User Login**
-  - Endpoint: `POST /api/auth/login`
-  - Functionality: Authenticate user
-  - Request Body: `{ "username": string, "password": string }`
-  - Response: JWT token and user info
+- **Purpose**: High-performance distributed messaging and event streaming
+- **Location**: `internal/messaging/nats/`
+- **Components**:
+  - `NATSManager` - Connection lifecycle and reliability
+  - `Publisher/Subscriber` - Message distribution
+  - `TopicFormatter` - Consistent topic naming (`settlechat.{category}.{action}.{roomID}`)
 
-#### Room Handlers (cmd/server/handler/roomHandler.go)
+#### 💬 Core Components
 
-- **Create Room**
+- **Hub & Room Management**: Central WebSocket connection management with room-based message routing
+- **AI Integration**: Pluggable AI providers (DeepSeek, OpenAI) with intelligent command processing
+- **Storage Layer**: PostgreSQL with optimized indexing for chat history and user management
+- **Event Handlers**: Specialized processors for different event types (user actions, AI commands, etc.)
 
-  - Endpoint: `POST /api/rooms`
-  - Functionality: Create new chat room
-  - Request Body: `{ "name": string, "description": string }`
-  - Response: Room details
+## 🛠️ Technology Stack
 
-- **Get Room List**
+| Layer              | Technology          | Purpose                             |
+| ------------------ | ------------------- | ----------------------------------- |
+| **Backend**        | Go 1.24+            | High-performance server runtime     |
+| **Event System**   | EventBus + NATS     | Abstracted event-driven messaging   |
+| **Database**       | PostgreSQL          | Persistent data storage             |
+| **Real-time**      | WebSocket           | Bidirectional client communication  |
+| **AI**             | DeepSeek/OpenAI     | Intelligent conversation processing |
+| **Infrastructure** | Docker Compose      | Service orchestration               |
+| **Frontend**       | Vanilla JS/HTML/CSS | Lightweight client interface        |
 
-  - Endpoint: `GET /api/rooms`
-  - Functionality: List all available rooms
-  - Response: Array of room objects
+### Message Flow Architecture
 
-- **Get Room Details**
+```
+📱 User Input (Frontend)
+          ↓
+🔌 WebSocket Connection (client.go)
+          ↓
+🏠 Chat Module (Hub/Room/Client) - Connection & Room Management
+          ↓
+📤 EventBus.PublishEvent() - Event Abstraction Layer
+          ↓
+🚀 NATS Topic - Distributed Messaging
+          ↓
+📥 Event Handlers - Business Logic Processing
+          ↓
+    ┌─────────┴─────────┐
+    ▼                   ▼
+🤖 AI Module        💾 Storage Module
+    │                   │
+    └─────────┬─────────┘
+              ▼
+📤 EventBus.PublishResponse() - Response Events
+              ▼
+🚀 NATS Broadcast - Message Distribution
+              ▼
+🔌 WebSocket WritePump - Real-time Delivery
+              ▼
+📱 Frontend Update (All Connected Clients)
 
-  - Endpoint: `GET /api/rooms/{roomID}`
-  - Functionality: Get specific room information
-  - Response: Room details including members
+Key Flow Steps:
+1. Frontend sends message via WebSocket
+2. Chat Module (Client) receives and routes
+3. EventBus abstracts event publishing to NATS
+4. NATS distributes to appropriate Event Handlers
+5. Handlers process business logic (AI/Storage)
+6. Response events published back through EventBus
+7. Real-time updates delivered to all clients
+```
 
-- **Join Room**
+### Event-Driven Benefits
 
-  - Endpoint: `POST /api/rooms/{roomID}/join`
-  - Functionality: Add user to room
-  - Response: Updated room details
+- **🔄 Loose Coupling**: EventBus abstracts NATS, making system components independent
+- **📈 Scalability**: NATS enables horizontal scaling and load distribution
+- **🧪 Testability**: Easy to mock EventBus for unit testing
+- **🔄 Flexibility**: Can replace NATS with other message systems (Kafka, Redis) without changing business logic
+- **⚡ Performance**: Asynchronous event processing prevents blocking operations
 
-- **Leave Room**
-  - Endpoint: `POST /api/rooms/{roomID}/leave`
-  - Functionality: Remove user from room
-  - Response: Success status
-
-#### WebSocket Handler (cmd/server/handler/wshandler.go)
-
-- **WebSocket Connection**
-  - Endpoint: `WS /ws`
-  - Functionality: Establish WebSocket connection
-  - Query Parameters: `roomID`, `token`
-  - Features:
-    - Real-time message exchange
-    - Room state synchronization
-    - User presence updates
-    - AI command processing
-
-### Message Types
-
-1. **Chat Messages**
-
-   ```json
-   {
-     "type": "message",
-     "content": "string",
-     "roomID": "string",
-     "senderID": "string",
-     "timestamp": "string"
-   }
-   ```
-
-2. **System Messages**
-
-   ```json
-   {
-     "type": "system",
-     "content": "string",
-     "roomID": "string",
-     "timestamp": "string"
-   }
-   ```
-
-3. **AI Commands**
-   ```json
-   {
-     "type": "ai_command",
-     "command": "string",
-     "content": "string",
-     "roomID": "string",
-     "senderID": "string",
-     "timestamp": "string"
-   }
-   ```
-
-### Authentication Flow
-
-1. User registers/logs in
-2. Server validates credentials
-3. JWT token generated
-4. Token used for subsequent requests
-5. WebSocket connection authenticated using token
-
-### Room Management Flow
-
-1. User creates/joins room
-2. Server validates permissions
-3. Room state updated
-4. Event published to room members
-5. WebSocket connections updated
-
-### WebSocket Connection Flow
-
-1. Client initiates connection
-2. Server validates token
-3. Connection upgraded to WebSocket
-4. Client joins room
-5. Real-time communication established
-
-### Detailed System Design
-
-#### 1. WebSocket Layer
-
-- Handles user connections and message transmission
-- Implements room management and user state tracking
-- Provides real-time message push
-
-#### 2. EventBus Layer
-
-- Event routing and distribution
-- Message format conversion
-- Error handling and retry mechanisms
-
-#### 3. NATS Layer
-
-- Message publish/subscribe
-- Topic management
-- Message persistence
-
-#### 4. AI Module
-
-- Command processing
-- Intelligent response generation
-- Context management
-
-#### 5. Storage Module
-
-- Message persistence
-- User data management
-- Room state maintenance
-
-## Workflows
-
-### Message Transmission Workflow
-
-1. **User Sends Message**
-
-   ```
-   Client -> WebSocket -> EventBus -> NATS -> Subscribers
-   ```
-
-2. **Message Processing Flow**
-
-   - WebSocket receives message
-   - Creates ChatMessage instance
-   - Publishes event through EventBus
-   - NATS broadcasts to subscribers
-   - Storage module persists message
-
-3. **Message Response Flow**
-   - Handler generates response
-   - Publishes response event through EventBus
-   - NATS broadcasts response
-   - WebSocket sends to user
-
-### Event Transmission Workflow
-
-1. **Event Publishing**
-
-   ```
-   Publisher -> EventBus -> NATS -> Subscribers -> Handlers
-   ```
-
-2. **Event Types**
-
-   - Chat message events
-   - User state events
-   - AI command events
-   - System events
-
-3. **Event Processing**
-   - Event validation
-   - Route distribution
-   - Error handling
-   - Response generation
-
-## Module Description
-
-### 1. WebSocket Module (internal/chat)
-
-- Client connection management
-- Message handling
-- Room state synchronization
-- User state tracking
-
-### 2. EventBus Module (internal/nats_messaging)
-
-- Event publish/subscribe
-- Topic management
-- Message format conversion
-- Error handling
-
-### 3. AI Module (internal/ai)
-
-- Command handlers
-- AI service management
-- Context management
-- Response generation
-
-### 4. Storage Module (internal/storage)
-
-- Data persistence
-- Query optimization
-- Transaction management
-- Connection pool management
-
-## Setup and Running
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- Docker
-- Go 1.21 or later
-- Make (optional)
+- **Go 1.24+**
+- **Docker & Docker Compose**
+- **Make** (optional, for development commands)
 
-### Step 1: Start Required Services
-
-1. **Start NATS Server**
+### 1. Clone and Setup
 
 ```bash
-docker run -d --name nats-server -p 4222:4222 nats:latest
+git clone https://github.com/ianwu0915/SettleChat.git
+cd SettleChat
+
+# Copy environment configuration
+cp .env.example .env
 ```
 
-2. **Start PostgreSQL**
+### 2. Start Infrastructure Services
 
 ```bash
-docker run -d --name postgres \
-    -e POSTGRES_USER=postgres \
-    -e POSTGRES_PASSWORD=password \
-    -e POSTGRES_DB=settlechat \
-    -p 5432:5432 \
-    postgres:latest
+# Start PostgreSQL and NATS using Docker Compose
+docker-compose -f docker/docker-compose.yml up -d
+
+# Verify services are running
+docker ps
 ```
 
-### Step 2: Configure Environment
+### 3. Configure Environment
 
-Create a `.env` file in the project root:
-
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=password
-DB_NAME=settlechat
+```bash
+# Edit .env file with your settings
+DATABASE_URL=postgres://postgres:secret@localhost:5432/settlechat
 NATS_URL=nats://localhost:4222
-WS_PORT=8080
+REDIS_URL=redis://localhost:6379
 ```
 
-### Step 3: Run the Application
-
-1. **Install Dependencies**
+### 4. Run the Application
 
 ```bash
+# Install dependencies
 go mod download
-```
 
-2. **Run the Server**
+# Run with Make (recommended)
+make run
 
-```bash
+# Or run directly
 go run cmd/server/main.go
 ```
 
-The server will start on port 8080 by default.
+### 5. Access the Application
 
-### Step 4: Access the Chat
+- **Web Interface**: http://localhost:8080
+- **Chat Application**: http://localhost:8080/login.html
+- **NATS Monitoring**: http://localhost:8222
 
-Open your browser and navigate to:
+## 💻 Development
 
-```
-http://localhost:8080
-```
-
-## Configuration
-
-### Environment Variables
-
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=password
-DB_NAME=settlechat
-NATS_URL=nats://localhost:4222
-WS_PORT=8080
-```
-
-### Topic Format
-
-```
-settlechat{env}.{category}.{action}.{roomID}
-```
-
-## Development Guide
-
-### Local Development
-
-1. Clone the repository
-2. Install dependencies
-3. Configure environment variables
-4. Run the service
-
-### Testing
+### Available Commands
 
 ```bash
-go test ./...
+# Code formatting and linting
+make format          # Format code with gofmt and goimports
+make lint           # Run staticcheck linter
+make check          # Run both format and lint
+
+# Testing and benchmarks
+go test ./...                           # Run all tests
+go test -bench=. ./benchmark           # Run performance benchmarks
+
+# Dependency management
+make tidy           # Clean up and verify dependencies
 ```
 
-### Deployment
-
-1. Build Docker image
-2. Configure environment variables
-3. Deploy service
-
-## Monitoring and Logging
-
-### Log Levels
-
-- DEBUG: Detailed debugging information
-- INFO: General operational information
-- WARN: Warning messages
-- ERROR: Error messages
-
-### Monitoring Metrics
-
-- Connection count
-- Message throughput
-- Response time
-- Error rate
-
-## Error Handling
-
-### Error Types
-
-1. Connection errors
-2. Message processing errors
-3. AI processing errors
-4. Storage errors
-
-### Error Recovery
-
-- Automatic reconnection
-- Message retry
-- Error logging
-- User notification
-
-## Performance Optimization
-
-### Optimization Strategies
-
-1. Connection pool management
-2. Message batching
-3. Caching mechanisms
-4. Asynchronous processing
-
-### Monitoring Metrics
-
-1. Response time
-2. Throughput
-3. Resource utilization
-4. Error rate
-
-## Security Considerations
-
-### Security Measures
-
-1. Authentication
-2. Message encryption
-3. Access control
-4. Input validation
-
-### Best Practices
-
-1. Regular updates
-2. Security audits
-3. Log monitoring
-4. Backup strategies
-
-## Project Structure
+### Project Structure
 
 ```
 settlechat/
-│
-├── cmd/
-│   └── server/             # Entry point main.go
-│       └── main.go
-│
-├── internal/               # Core logic, not exposed externally
-│   ├── ws/                 # WebSocket handler, connection upgrade, entry point
-│   ├── chat/               # Chatroom, Client, Hub core logic
-│   ├── ai/                 # AI integration (DeepSeek, OpenAI, etc.)
-│   ├── storage/            # Message persistence logic (currently using SQLite)
-│   ├── command/            # Logic for handling commands like `/summary`
-│   └── utils/              # UUID, time, string processing
-│
-├── web/                    # Static resources (HTML/JS/CSS) or frontend build output
-│   └── index.html
-│
-├── go.mod
-├── go.sum
-└── README.md
+├── cmd/server/                 # Application entry point
+│   ├── main.go                # Server initialization and routing
+│   └── handler/               # HTTP request handlers
+│       ├── authHandlers.go    # Authentication endpoints
+│       ├── roomHandler.go     # Room management endpoints
+│       └── wshandler.go       # WebSocket upgrade handler
+├── internal/                  # Core application logic
+│   ├── ai/                    # AI integration modules
+│   │   ├── agent.go           # AI conversation agent
+│   │   ├── manager.go         # AI service management
+│   │   ├── command.go         # AI command processing
+│   │   ├── summary.go         # Conversation summarization
+│   │   └── providers/         # AI provider implementations
+│   ├── chat/                  # Real-time chat core
+│   │   ├── hub.go            # Connection management hub
+│   │   ├── room.go           # Chat room logic
+│   │   └── client.go         # WebSocket client handling
+│   ├── messaging/             # Event-driven messaging system
+│   │   ├── eventbus.go       # Event abstraction layer (wraps NATS)
+│   │   └── nats/             # NATS implementation
+│   │       ├── nats.go       # Connection management
+│   │       ├── publish.go    # Message publishing
+│   │       ├── subscribe.go  # Event subscription & routing
+│   │       └── nats_topics.go # Topic formatting utilities
+│   ├── storage/               # Data persistence
+│   │   ├── db.go             # Database connection
+│   │   ├── messageStore.go   # Message CRUD operations
+│   │   └── user.go           # User management
+│   └── event_handlers/        # Event processing
+├── web/                       # Frontend assets
+│   ├── login.html            # Authentication interface
+│   ├── rooms.html            # Room management UI
+│   └── chat.html             # Chat interface
+├── benchmark/                 # Performance testing
+├── docker/                    # Container configuration
+└── docs/                      # Documentation
 ```
 
-## Future Scaling Considerations
+## 🤖 AI Features
 
-1. Client-to-Server Assignment => Load Balancing + Consistent Hashing
-2. Read/Write Optimization with Database Choices
-3. Middleware Like Kafka/Flink for High Message Throughput
-4. Caching Implementation
-5. Distributed ID Generation
-6. Persistent Client Connections with Zookeeper and Load Balancer
-7. Message Streaming to Groups Before Database Storage using Flink or Kafka
-8. Redesign Using Single WebSocket Connection per Server
+### Available AI Commands
 
-### Setup-NATS Server
+| Command          | Description                     | Example                                          |
+| ---------------- | ------------------------------- | ------------------------------------------------ |
+| `/summary`       | Generate conversation summary   | `/summary`                                       |
+| `/help`          | Show available commands         | `/help`                                          |
+| `/stats`         | Display AI assistant statistics | `/stats`                                         |
+| `/clear`         | Clear summary history           | `/clear`                                         |
+| `/prompt <text>` | Custom AI processing            | `/prompt analyze the technical issues discussed` |
+
+### AI Integration
+
+SettleChat supports multiple AI providers through a pluggable interface:
+
+```go
+type Provider interface {
+    GetName() string
+    GenerateSummary(ctx context.Context, messages []MessageInput, previousSummary string) (string, error)
+    ProcessPrompt(ctx context.Context, messages []MessageInput) (string, error)
+}
+```
+
+Currently supported providers:
+
+- **DeepSeek**: Cost-effective AI processing
+- **Mock Provider**: Development and testing
+- **OpenAI**: (Planned) GPT integration
+
+## 📊 Performance & Benchmarks
+
+The application includes comprehensive benchmarking for performance monitoring:
 
 ```bash
-docker run -d --name nats-server -p 4222:4222 nats:latest
+# Run WebSocket connection benchmarks
+go test -bench=BenchmarkWebSocketConnections ./benchmark
+
+# Run concurrent connection tests
+go test -bench=BenchmarkConcurrentWebSocketConnections ./benchmark
+
+# Run message throughput benchmarks
+go test -bench=BenchmarkMessageThroughput ./benchmark
+
+# Run database performance tests
+go test -bench=BenchmarkSaveMessage ./benchmark
 ```
 
-### AI-PART Desgin
+## 🔧 Configuration
+
+### Environment Variables
+
+```bash
+# Database Configuration
+DATABASE_URL=postgres://user:password@host:port/database
+
+# NATS Configuration
+NATS_URL=nats://localhost:4222
+
+# Redis Configuration (optional)
+REDIS_URL=redis://localhost:6379
+
+# Application Environment
+ENVIRONMENT=dev|prod
+```
+
+### NATS Topic Structure
+
+```
+settlechat{env}.{category}.{action}.{roomID}
+
+Examples:
+- settlechat.user.joined.room123
+- settlechat.message.chat.room123
+- settlechat.ai.command.room123
+- settlechat.message.history.request.room123
+```
+
+## 🐳 Deployment
+
+### Docker Deployment
+
+```bash
+# Build application image
+docker build -t settlechat .
+
+# Run with Docker Compose
+docker-compose -f docker/docker-compose.yml up -d
+
+# Scale the application
+docker-compose -f docker/docker-compose.yml up -d --scale app=3
+```
+
+### Production Considerations
+
+- **Load Balancing**: Use NGINX or similar for WebSocket load balancing
+- **Database**: Configure PostgreSQL with proper connection pooling
+- **NATS Clustering**: Set up NATS cluster for high availability
+- **Monitoring**: Implement metrics collection and alerting
+- **SSL/TLS**: Configure HTTPS and WSS for production
+
+## 🔮 Roadmap
+
+### Upcoming Features
+
+- [ ] **Advanced AI Capabilities**
+
+  - GPT-4 integration
+  - Custom AI model training
+  - Multi-language support
+
+- [ ] **Enhanced Collaboration**
+
+  - File sharing and media support
+  - Video/voice call integration
+  - Screen sharing capabilities
+
+- [ ] **Enterprise Features**
+
+  - SSO integration (SAML, OAuth)
+  - Advanced permissions and roles
+  - Audit logging and compliance
+
+- [ ] **Performance & Scale**
+
+  - Redis caching layer
+  - Horizontal scaling improvements
+  - WebRTC for peer-to-peer communication
+
+- [ ] **Developer Experience**
+  - REST API documentation
+  - WebSocket API documentation
+  - Client SDKs (Go, Python, JavaScript)
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Setup
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes** and add tests
+4. **Run the test suite**: `go test ./...`
+5. **Run benchmarks**: `go test -bench=. ./benchmark`
+6. **Commit your changes**: `git commit -m 'Add amazing feature'`
+7. **Push to the branch**: `git push origin feature/amazing-feature`
+8. **Open a Pull Request**
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [NATS](https://nats.io) for the excellent messaging system
+- [Gorilla WebSocket](https://github.com/gorilla/websocket) for WebSocket implementation
+- [PostgreSQL](https://postgresql.org) for reliable data storage
+- [DeepSeek](https://deepseek.com) for AI integration capabilities
+
+---
+
+**Built with ❤️ using Go, NATS, and modern web technologies**
+
+For questions, issues, or feature requests, please [open an issue](https://github.com/ianwu0915/SettleChat/issues) or join our community discussions.
