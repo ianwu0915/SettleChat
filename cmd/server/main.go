@@ -12,11 +12,12 @@ import (
 	"github.com/ianwu0915/SettleChat/cmd/server/handler"
 	"github.com/ianwu0915/SettleChat/internal/ai"
 	"github.com/ianwu0915/SettleChat/internal/chat"
-	handlers "github.com/ianwu0915/SettleChat/internal/nats_event_handlers"
-	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
+	handlers "github.com/ianwu0915/SettleChat/internal/event_handlers"
+	"github.com/ianwu0915/SettleChat/internal/messaging"
+	"github.com/ianwu0915/SettleChat/internal/messaging/nats"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/joho/godotenv"
-	"github.com/nats-io/nats.go"
+	nat "github.com/nats-io/nats.go"
 )
 
 func main() {
@@ -44,19 +45,19 @@ func main() {
 	// 3. 初始化 NATS 連接
 	natsURL := os.Getenv("NATS_URL")
 	if natsURL == "" {
-		natsURL = nats.DefaultURL
+		natsURL = nat.DefaultURL
 	}
-	natsManager := messaging.NewNATSManager(natsURL, true)
+	natsManager := nats.NewNATSManager(natsURL, true)
 	if err := natsManager.Connect(); err != nil {
 		log.Fatalf("Failed to connect to NATS: %v", err)
 	}
 	defer natsManager.Disconnect()
 
 	// 4. 創建主題格式化器
-	nat_topic_formatter := messaging.NewTopicFormatter("")
+	nat_topic_formatter :=nats.NewTopicFormatter("")
 
 	// 5. 創建發布器
-	publisher := messaging.NewPublisher(natsManager, env, nat_topic_formatter)
+	publisher := nats.NewPublisher(natsManager, env, nat_topic_formatter)
 
 	// 5.1 創建事件總線
 	eventBus := messaging.NewEventBus(natsManager, nat_topic_formatter)
@@ -73,7 +74,7 @@ func main() {
 	handlerManager.Initialize()
 
 	// 8. 創建並初始化訂閱器 
-	subscriber := messaging.NewSubscriber(natsManager, store, env, nat_topic_formatter)
+	subscriber := nats.NewSubscriber(natsManager, store, env, nat_topic_formatter)
 	handlerManager.Register(subscriber)
 
 	// 設置 Hub 的訂閱器
@@ -117,7 +118,7 @@ func setupRoutes(mux *http.ServeMux, hub *chat.Hub, auth *handler.AuthHandler, r
 }
 
 // gracefulShutdown 處理優雅關閉
-func gracefulShutdown(server *http.Server, hub *chat.Hub, subscriber *messaging.Subscriber) {
+func gracefulShutdown(server *http.Server, hub *chat.Hub, subscriber *nats.Subscriber) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan

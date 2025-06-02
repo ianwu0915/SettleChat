@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
+	messaging "github.com/ianwu0915/SettleChat/internal/messaging"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 

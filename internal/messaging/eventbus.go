@@ -9,16 +9,17 @@ import (
 
 	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/ianwu0915/SettleChat/internal/types"
+	"github.com/ianwu0915/SettleChat/internal/messaging/nats"
 )
 
 // EventBus 提供統一的事件發布機制
 type EventBus struct {
-	natsManager *NATSManager
+	natsManager *nats.NATSManager
 	nat_topic_formatter      types.TopicFormatter
 }
 
 // NewEventBus 創建一個新的事件總線
-func NewEventBus(natsManager *NATSManager, nat_topic_formatter types.TopicFormatter) *EventBus {
+func NewEventBus(natsManager *nats.NATSManager, nat_topic_formatter types.TopicFormatter) *EventBus {
 	return &EventBus{
 		natsManager: natsManager,
 		nat_topic_formatter:      nat_topic_formatter,

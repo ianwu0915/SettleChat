@@ -1,11 +1,11 @@
-package handlers
+package event_handlers
 
 import (
 	"strings"
 
 	"github.com/ianwu0915/SettleChat/internal/ai"
 	"github.com/ianwu0915/SettleChat/internal/chat"
-	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
+	"github.com/ianwu0915/SettleChat/internal/messaging/nats"
 
 	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/ianwu0915/SettleChat/internal/types"
@@ -57,7 +57,7 @@ func (m *HandlerManager) Initialize() {
 }
 
 // Register 註冊所有處理器到NATS訂閱器
-func (m *HandlerManager) Register(subscriber *messaging.Subscriber) {
+func (m *HandlerManager) Register(subscriber *nats.Subscriber) {
 	for topic, handler := range m.handlers {
 		parts := strings.Split(topic, ".")
 		if len(parts) >= 2 {

@@ -5,18 +5,19 @@ import (
 	"log"
 	"net/http"
 
-	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
+	messaging "github.com/ianwu0915/SettleChat/internal/messaging"
+	"github.com/ianwu0915/SettleChat/internal/messaging/nats"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 )
 
 type RoomHandler struct {
 	DB        *storage.PostgresStore
-	publisher *messaging.NATSPublisher
+	publisher *nats.NATSPublisher
 	env       string
 	EventBus  *messaging.EventBus
 }
 
-func NewRoomHandler(store *storage.PostgresStore, publisher *messaging.NATSPublisher, env string, eventBus *messaging.EventBus) *RoomHandler {
+func NewRoomHandler(store *storage.PostgresStore, publisher *nats.NATSPublisher, env string, eventBus *messaging.EventBus) *RoomHandler {
 	return &RoomHandler{
 		DB:        store,
 		publisher: publisher,

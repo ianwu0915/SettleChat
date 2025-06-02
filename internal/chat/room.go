@@ -3,7 +3,8 @@ package chat
 import (
 	"log"
 	"sync"
-	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
+	"github.com/ianwu0915/SettleChat/internal/messaging"
+	"github.com/ianwu0915/SettleChat/internal/messaging/nats"
 )
 
 // What we do in Room: Fire a GoRoutine
@@ -14,13 +15,13 @@ import (
 type Room struct {
 	ID         string
 	Clients    map[string]*Client
-	Publisher  *messaging.NATSPublisher
-	Subscriber *messaging.Subscriber
+	Publisher  *nats.NATSPublisher
+	Subscriber *nats.Subscriber
 	EventBus   *messaging.EventBus
 	Mu         sync.Mutex
 }
 
-func NewRoom(id string, publisher *messaging.NATSPublisher, subscriber *messaging.Subscriber, eventBus *messaging.EventBus) *Room {
+func NewRoom(id string, publisher *nats.NATSPublisher, subscriber *nats.Subscriber, eventBus *messaging.EventBus) *Room {
 	return &Room{
 		ID:         id,
 		Clients:    make(map[string]*Client),
@@ -99,7 +100,7 @@ func (r *Room) SaveRemoveClient(client *Client) {
 	r.Mu.Unlock()
 }
 
-func (r *Room) Run(subscriber *messaging.Subscriber) {
+func (r *Room) Run(subscriber *nats.Subscriber) {
 	// 訂閱房間的所有相關主題
 	if err := subscriber.SubscribeToRoom(r.ID); err != nil {
 		log.Printf("Failed to subscribe to room %s: %v", r.ID, err)

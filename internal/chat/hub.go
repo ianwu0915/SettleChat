@@ -4,7 +4,8 @@ import (
 	"log"
 	"sync"
 
-	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
+	"github.com/ianwu0915/SettleChat/internal/messaging"
+	"github.com/ianwu0915/SettleChat/internal/messaging/nats"
 	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/ianwu0915/SettleChat/internal/types"
 )
@@ -14,14 +15,14 @@ type Hub struct {
 	Register   chan *Client
 	UnRegister chan *Client
 	Store      *storage.PostgresStore
-	Publisher  *messaging.NATSPublisher
-	Subscriber *messaging.Subscriber
+	Publisher  *nats.NATSPublisher
+	Subscriber *nats.Subscriber
 	Topics     types.TopicFormatter
 	EventBus   *messaging.EventBus
 	mu         sync.Mutex
 }
 
-func NewHub(store *storage.PostgresStore, publisher *messaging.NATSPublisher, subscriber *messaging.Subscriber, topics types.TopicFormatter, eventbus *messaging.EventBus) *Hub {
+func NewHub(store *storage.PostgresStore, publisher *nats.NATSPublisher, subscriber *nats.Subscriber, topics types.TopicFormatter, eventbus *messaging.EventBus) *Hub {
 	hub := &Hub{
 		Rooms:      make(map[string]*Room),
 		Register:   make(chan *Client),
