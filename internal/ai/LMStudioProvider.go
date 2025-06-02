@@ -41,42 +41,6 @@ func (p *LMProvider) GetName() string {
 	return fmt.Sprintf("LM(%s)", p.Model)
 }
 
-// // CanHandle 檢查是否能處理特定任務
-// func (p *LMProvider) CanHandle(taskType TaskType, complexity TaskComplexity) bool {
-// 	// LM 適合處理簡單到中等複雜度的任務
-// 	switch taskType {
-// 	case TaskTypeSummary, TaskTypePrompt:
-// 		return complexity <= TaskMedium // 只處理簡單和中等任務
-// 	default:
-// 		return false
-// 	}
-// }
-
-// EstimateCost 估算任務成本
-// func (p *LMProvider) EstimateCost(taskType TaskType, complexity TaskComplexity, inputLength int) float64 {
-	// // LM 的價格通常比 OpenAI 便宜
-	// baseCostPer1K := 0.0007 // 假設 $0.0007 per 1K tokens
-	
-	// // 估算 token 數
-	// estimatedTokens := float64(inputLength) / 4
-	
-	// // 根據任務複雜度調整
-	// complexityMultiplier := 1.0
-	// switch complexity {
-	// case TaskSimple:
-	// 	complexityMultiplier = 0.3
-	// case TaskMedium:
-	// 	complexityMultiplier = 0.7
-	// case TaskComplex:
-	// 	complexityMultiplier = 1.0
-	// }
-	
-	// // 考慮輸出 tokens
-	// outputTokensRatio := 0.3
-	// totalTokens := estimatedTokens * (1 + outputTokensRatio)
-	
-	// return (totalTokens / 1000) * baseCostPer1K * complexityMultiplier
-// }
 
 // /summary 命令 
 // GenerateSummary 生成摘要

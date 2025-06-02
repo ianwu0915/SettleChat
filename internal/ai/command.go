@@ -94,7 +94,7 @@ func (a *Agent) HandlePromptCommand(ctx context.Context, msg *AIMessage) (string
 	messageInputs := a.preprocessMessagesForAI([]storage.ChatMessage{msg.ChatMessage})
 	
 	// 使用 Provider 處理提示
-	return a.Provider.ProcessPrompt(ctx, messageInputs)
+	return a.Provider.ProcessPrompt(ctx, msg.Prompt, messageInputs)
 }
 
 

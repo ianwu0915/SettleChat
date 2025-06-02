@@ -66,8 +66,11 @@ func main() {
 	hub := chat.NewHub(store, publisher, nil, nat_topic_formatter, eventBus)
 	go hub.Run()
 
-	mockProvider := ai.NewMockProvider("test_provider")
-	aiManager := ai.NewManager(store, mockProvider, eventBus)
+	// mockProvider := ai.NewMockProvider("test_provider")
+	// aiManager := ai.NewManager(store, mockProvider, eventBus)
+	lm_provider := ai.NewLMProvider()
+	aiManager := ai.NewManager(store, lm_provider, eventBus)
+	
 
 	// 7. 創建並初始化處理器管理器
 	handlerManager := handlers.NewHandlerManager(store, publisher, nat_topic_formatter, env, hub, aiManager)
