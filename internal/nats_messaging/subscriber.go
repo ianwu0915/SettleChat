@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"log"
 	"strings"
-
 	"github.com/ianwu0915/SettleChat/internal/storage"
 	"github.com/ianwu0915/SettleChat/internal/types"
 	"github.com/nats-io/nats.go"
 )
 
 // Subscriber 管理 NATS 訂閱
+// 每一個訂閱都有對應的Handler 去接收並處理發布到主題的訊息
 type Subscriber struct {
 	natsManager *NATSManager
 	store       *storage.PostgresStore

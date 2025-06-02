@@ -101,6 +101,11 @@ func (c *Client) ReadPump() {
 		return nil
 	})
 
+
+	// Read Message from Websocket:
+	// 1. heartbeat msg
+	// 2. AI command
+	// 3. Normal ChatMessage
 	for {
 		var msg storage.ChatMessage
 		log.Println("waiting for message...")

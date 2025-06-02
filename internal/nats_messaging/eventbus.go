@@ -14,27 +14,27 @@ import (
 // EventBus 提供統一的事件發布機制
 type EventBus struct {
 	natsManager *NATSManager
-	topics      types.TopicFormatter
+	nat_topic_formatter      types.TopicFormatter
 }
 
 // NewEventBus 創建一個新的事件總線
-func NewEventBus(natsManager *NATSManager, topics types.TopicFormatter) *EventBus {
+func NewEventBus(natsManager *NATSManager, nat_topic_formatter types.TopicFormatter) *EventBus {
 	return &EventBus{
 		natsManager: natsManager,
-		topics:      topics,
+		nat_topic_formatter:      nat_topic_formatter,
 	}
 }
 
 // PublishEvent 發布事件到相應的主題
-// 根據event得到對應的NATS topics 並透過natsManage發布
+// 根據event類型得到對應的NATS topics 並透過natsManager發布
 func (eb *EventBus) PublishEvent(event types.Event, roomID string) error {
 	data, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("marshal event error: %w", err)
 	}
 
-	// Getting Topic
-	topic := eb.getTopicForEvent(event, roomID)
+	// Get Topic of event using nats_topic formatter
+	topic := eb.getNatsTopicForEvent(event, roomID)
 	log.Printf("Publishing event type [%s] to topic: %s", event.GetType(), topic)
 
 	// NatsManager發布到對應topic
@@ -45,54 +45,54 @@ func (eb *EventBus) PublishEvent(event types.Event, roomID string) error {
 	return nil
 }
 
-// getTopicForEvent 根據事件類型獲取對應的主題
-func (eb *EventBus) getTopicForEvent(event types.Event, roomID string) string {
+// getNatsTopicForEvent 根據事件類型獲取對應的NATS主題
+func (eb *EventBus) getNatsTopicForEvent(event types.Event, roomID string) string {
 	eventType := event.GetType()
 
 	// 根據事件類型前綴確定主題
 	if strings.HasPrefix(eventType, "connection.") {
-		return eb.topics.GetConnectionTopic(roomID)
+		return eb.nat_topic_formatter.GetConnectionTopic(roomID)
 	}
 
 	if eventType == types.EventTypeUserJoined {
-		return eb.topics.GetUserJoinedTopic(roomID)
+		return eb.nat_topic_formatter.GetUserJoinedTopic(roomID)
 	}
 
 	if eventType == types.EventTypeUserLeft {
-		return eb.topics.GetUserLeftTopic(roomID)
+		return eb.nat_topic_formatter.GetUserLeftTopic(roomID)
 	}
 
 	if eventType == types.EventTypeUserPresence {
-		return eb.topics.GetPresenceTopic(roomID)
+		return eb.nat_topic_formatter.GetPresenceTopic(roomID)
 	}
 
 	if eventType == types.EventTypeNewMessage {
-		return eb.topics.GetMessageTopic(roomID)
+		return eb.nat_topic_formatter.GetMessageTopic(roomID)
 	}
 
 	if eventType == types.EventTypeBroadcastMsg {
-		return eb.topics.GetBroadcastTopic(roomID)
+		return eb.nat_topic_formatter.GetBroadcastTopic(roomID)
 	}
 
 	if eventType == types.EventTypeNewAICommand {
-		return eb.topics.GetAICommandTopic(roomID)
+		return eb.nat_topic_formatter.GetAICommandTopic(roomID)
 	}
 
 	// HistoryRequest + HistoryResponse
 	if strings.HasPrefix(eventType, "message.history") {
 		// 歷史消息請求和響應使用不同的主題
 		if strings.Contains(eventType, "request") {
-			return eb.topics.GetHistoryRequestTopic(roomID)
+			return eb.nat_topic_formatter.GetHistoryRequestTopic(roomID)
 		}
 
 		// 對於響應，我們假設使用的是歷史消息響應事件類型
 		// 這部分需要根據實際的歷史消息響應事件結構來調整
 		// 暫時使用固定的用戶ID "system"
-		return eb.topics.GetHistoryResponseTopic(roomID, "system")
+		return eb.nat_topic_formatter.GetHistoryResponseTopic(roomID, "system")
 	}
 
 	// 默認使用系統消息主題
-	return eb.topics.GetSystemMessageTopic(roomID)
+	return eb.nat_topic_formatter.GetSystemMessageTopic(roomID)
 }
 
 // PublishConnectEvent 發布連接事件
@@ -140,7 +140,7 @@ func (eb *EventBus) PublishNewMessageEvent(roomID, senderID, sender, content str
 		return fmt.Errorf("failed to marshal message event: %w", err)
 	}
 
-	topic := eb.topics.GetMessageTopic(roomID)
+	topic := eb.nat_topic_formatter.GetMessageTopic(roomID)
 	return eb.natsManager.Publish(topic, data)
 }
 
@@ -155,6 +155,5 @@ func (eb *EventBus) PublishAICommandEvent(msg storage.ChatMessage) error {
 	// 創建 AI 命令事件
 	event := types.NewAICommandEvent(&msg)
 	return eb.PublishEvent(event, msg.RoomID)
-	
 }
  

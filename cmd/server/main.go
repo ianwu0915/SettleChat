@@ -6,17 +6,15 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/ianwu0915/SettleChat/cmd/server/handler"
 	"github.com/ianwu0915/SettleChat/internal/ai"
 	"github.com/ianwu0915/SettleChat/internal/chat"
-	handlers "github.com/ianwu0915/SettleChat/internal/event_handlers"
+	handlers "github.com/ianwu0915/SettleChat/internal/nats_event_handlers"
 	messaging "github.com/ianwu0915/SettleChat/internal/nats_messaging"
 	"github.com/ianwu0915/SettleChat/internal/storage"
-	"github.com/ianwu0915/SettleChat/internal/types"
 	"github.com/joho/godotenv"
 	"github.com/nats-io/nats.go"
 )
@@ -55,28 +53,28 @@ func main() {
 	defer natsManager.Disconnect()
 
 	// 4. 創建主題格式化器
-	topics := messaging.NewTopicFormatter("")
+	nat_topic_formatter := messaging.NewTopicFormatter("")
 
 	// 5. 創建發布器
-	publisher := messaging.NewPublisher(natsManager, env, topics)
+	publisher := messaging.NewPublisher(natsManager, env, nat_topic_formatter)
 
 	// 5.1 創建事件總線
-	eventBus := messaging.NewEventBus(natsManager, topics)
+	eventBus := messaging.NewEventBus(natsManager, nat_topic_formatter)
 
 	// 6. 創建 Hub
-	hub := chat.NewHub(store, publisher, nil, topics, eventBus)
+	hub := chat.NewHub(store, publisher, nil, nat_topic_formatter, eventBus)
 	go hub.Run()
 
 	mockProvider := ai.NewMockProvider("test_provider")
 	aiManager := ai.NewManager(store, mockProvider, eventBus)
 
-	// 7. 創建消息處理器：將所有種類的消息處理器都加到對應的topics下： map[string]types.MessageHandler
-	// "user.joined" : userJoinHandler
-	allEventHandlerList := initializeHandlers(store, publisher, topics, env, hub, aiManager)
+	// 7. 創建並初始化處理器管理器
+	handlerManager := handlers.NewHandlerManager(store, publisher, nat_topic_formatter, env, hub, aiManager)
+	handlerManager.Initialize()
 
-	// 8. 創建並初始化訂閱器 + 這操ㄙㄛ
-	subscriber := messaging.NewSubscriber(natsManager, store, env, topics)
-	registerHandlers(subscriber, allEventHandlerList)
+	// 8. 創建並初始化訂閱器 
+	subscriber := messaging.NewSubscriber(natsManager, store, env, nat_topic_formatter)
+	handlerManager.Register(subscriber)
 
 	// 設置 Hub 的訂閱器
 	hub.Subscriber = subscriber
@@ -102,34 +100,6 @@ func main() {
 	log.Printf("Server starting on %s in %s environment", server.Addr, env)
 	if err := server.ListenAndServe(); err != http.ErrServerClosed {
 		log.Fatalf("HTTP server error: %v", err)
-	}
-}
-
-// initializeHandlers 初始化所有消息處理器
-func initializeHandlers(store *storage.PostgresStore, publisher types.NATSPublisher, topics types.TopicFormatter, env string, hub *chat.Hub, aiManager *ai.Manager) map[string]types.MessageHandler {
-
-	handlers_list := make(map[string]types.MessageHandler)
-	handlers_list["user.joined"] = handlers.NewUserJoinedHandler(store, publisher, topics, env)
-	handlers_list["user.left"] = handlers.NewUserLeftHandler(store, publisher, topics, env)
-	handlers_list["user.presence"] = handlers.NewPresenceHandler(store, topics, env)
-	handlers_list["message.chat"] = handlers.NewChatMessageHandler(store, publisher, topics)
-	handlers_list["message.history.request"] = handlers.NewHistoryHandler(store, publisher, topics, env)
-	handlers_list["message.history.response"] = handlers.NewHistoryResponseHandler(hub)
-	handlers_list["message.broadcast"] = handlers.NewBroadcastHandler(hub)
-	handlers_list["system.message"] = handlers.NewSystemMessageHandler(publisher, topics, env)
-	handlers_list["connection.event"] = handlers.NewConnectionEventHandler(store, publisher, topics)
-	handlers_list["ai.command"] = handlers.NewAICommandHandler(publisher, topics, env, aiManager)
-
-	return handlers_list
-}
-
-// registerHandlers 註冊所有處理器到NATS訂閱器
-func registerHandlers(subscriber *messaging.Subscriber, handlers map[string]types.MessageHandler) {
-	for topic, handler := range handlers {
-		parts := strings.Split(topic, ".")
-		if len(parts) >= 2 {
-			subscriber.RegisterHandler(parts[0], strings.Join(parts[1:], "."), handler)
-		}
 	}
 }
 
