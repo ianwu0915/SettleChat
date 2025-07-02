@@ -56,6 +56,8 @@ func (h *AICommandHandler) Handle(msg *nats.Msg) error {
 		return h.publishResponse(errorMsg)
 	}
 
+	log.Println(response)
+
 	// 如果不是命令，直接返回
 	if !isCommand {
 		return nil
@@ -89,7 +91,7 @@ func (h *AICommandHandler) publishResponse(msg storage.ChatMessage) error {
 		return err
 	}
 
-	log.Printf("Successfully published AI response to room %s", msg.RoomID)
+	log.Printf("Successfully published AI response to room %s with sender id %s", msg.RoomID, msg.SenderID)
 	return nil
 }
 

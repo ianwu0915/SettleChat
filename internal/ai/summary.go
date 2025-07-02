@@ -107,6 +107,7 @@ func (a *Agent) updateSummaryCache(messages []storage.ChatMessage, newSummary st
 		for _, msg := range messages {
 			a.summaryCache.SummarizedMsgIDs[msg.ID] = true
 		}
+		
 	}
 }
 

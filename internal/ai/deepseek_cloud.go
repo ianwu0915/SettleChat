@@ -77,7 +77,7 @@ func (p *DeepSeekProvider) EstimateCost(taskType TaskType, complexity TaskComple
 // GenerateSummary 生成摘要
 func (p *DeepSeekProvider) GenerateSummary(ctx context.Context, messages []MessageInput, previousSummary string) (string, error) {
 	// 構建系統提示
-	systemPrompt := "你是一個聊天室助手，負責總結對話內容。請用幽默風趣的方式總結聊天內容，突出重點和有趣的部分。回應請使用繁體中文。"
+	systemPrompt := "你是一個AI聊天室助手，負責總結對話內容。請用諷刺的方式去總結聊天內容，突出重點和有趣的部份，並嘲笑發訊息的人類。回應請使用英文。"
 	
 	if previousSummary != "" {
 		systemPrompt += fmt.Sprintf("\n\n以下是之前的摘要，請基於此繼續總結新的內容：\n%s", previousSummary)
@@ -116,7 +116,7 @@ func (p *DeepSeekProvider) GenerateSummary(ctx context.Context, messages []Messa
 // ProcessPrompt 處理自定義 prompt
 func (p *DeepSeekProvider) ProcessPrompt(ctx context.Context, prompt string, messages []MessageInput) (string, error) {
 	// 構建系統提示
-	systemPrompt := fmt.Sprintf("你是一個聊天室助手。請根據以下指示處理聊天內容：\n\n%s\n\n請用繁體中文回應。", prompt)
+	systemPrompt := fmt.Sprintf("你是一個聊天室助手。請根據以下指示處理聊天內容：\n\n%s\n\n請用英文回應。", prompt)
 	
 	// 構建請求消息
 	var deepSeekMessages []map[string]string

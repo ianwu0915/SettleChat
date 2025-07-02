@@ -92,15 +92,50 @@
         border-bottom-right-radius: 4px;
       }
 
-      .system {
-        background: #333;
-        color: #aaa;
-        border-radius: 10px;
-        max-width: 80%;
-        margin: 8px auto;
-        font-size: 14px;
-        font-style: italic;
+      /* AI Summary Styles */
+      .ai-summary-container {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        margin: 20px 0;
+        align-items: center;
+      }
+
+      .ai-summary-title {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #ffffff;
+        padding: 12px 20px;
+        border-radius: 15px;
+        font-weight: 600;
+        font-size: 16px;
+        margin-bottom: 12px;
         text-align: center;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .ai-summary-paragraph {
+        background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+        color: #e2e8f0;
+        padding: 14px 18px;
+        border-radius: 12px;
+        margin-bottom: 8px;
+        font-size: 15px;
+        line-height: 1.6;
+        max-width: 85%;
+        text-align: left;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        border-left: 4px solid #667eea;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .ai-summary-paragraph:hover {
+        transform: translateX(4px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      .ai-summary-paragraph:last-child {
+        margin-bottom: 0;
       }
 
       .sender-name {
@@ -125,6 +160,12 @@
         background: #2a2a2a;
         color: #e0e0e0;
         font-size: 15px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      input:focus {
+        border-color: #6366f1;
       }
 
       input::placeholder {
@@ -245,10 +286,9 @@
           }, 2000);
 
           // Setup heartbeat
-          clearInterval(heartbeatInterval); // Clear any existing interval
+          clearInterval(heartbeatInterval);
           heartbeatInterval = setInterval(function () {
             if (ws.readyState === WebSocket.OPEN) {
-              // Send a special heartbeat message
               const heartbeat = {
                 content: "",
                 sender_id: "",
@@ -261,7 +301,7 @@
                 console.error("Failed to send heartbeat:", e);
               }
             }
-          }, 30000); // Every 30 seconds
+          }, 30000);
         };
 
         ws.onclose = function (event) {
@@ -272,13 +312,11 @@
           connectionStatus.textContent = "Disconnected. Reconnecting...";
           connectionStatus.style.opacity = 1;
 
-          // Don't try to reconnect if explicitly exited
           if (event.code === 1000 && event.reason === "exit") {
             console.log("Explicit exit, not reconnecting");
             return;
           }
 
-          // Try to reconnect with exponential backoff
           const delay = Math.min(
             30000,
             1000 * Math.pow(1.5, reconnectAttempts)
@@ -299,21 +337,59 @@
         };
 
         ws.onmessage = function (event) {
+          console.log("Received message:", event.data);
           const msg = JSON.parse(event.data);
 
-          // Handle system messages
-          if (msg.sender_id === "system") {
+          // Handle AI Summary messages
+          if (msg.sender_id === "ai") {
+            console.log("[AI Summary] Processing text content:", msg.content);
+            
             const container = document.createElement("div");
-            container.className = "message-container";
+            container.className = "ai-summary-container";
 
-            const bubble = document.createElement("div");
-            bubble.className = "msg system";
-            bubble.textContent = msg.content;
+            // AI Summary title
+            const summaryTitle = document.createElement("div");
+            summaryTitle.className = "ai-summary-title";
+            summaryTitle.innerHTML = "🤖 AI Summary";
+            container.appendChild(summaryTitle);
 
-            container.appendChild(bubble);
+            // Parse the simple text format with ||| separators
+            let content = msg.content.trim();
+            
+            // Handle potential escaped characters
+            if (content.includes('\\|||')) {
+              content = content.replace(/\\|||/g, '|||');
+            }
+            
+            // Split by triple pipes
+            const paragraphs = content.split('|||');
+            console.log("[AI Summary] Split paragraphs:", paragraphs);
+            
+            paragraphs.forEach((para, index) => {
+              const trimmed = para.trim();
+              if (trimmed && trimmed !== "" && trimmed.length > 0) {
+                console.log(`[AI Summary] Adding paragraph ${index + 1}: "${trimmed}"`);
+                
+                const paraDiv = document.createElement("div");
+                paraDiv.className = "ai-summary-paragraph";
+                paraDiv.textContent = trimmed;
+                container.appendChild(paraDiv);
+              } else {
+                console.log(`[AI Summary] Skipping empty paragraph ${index + 1}: "${trimmed}"`);
+              }
+            });
+
+            // If no valid paragraphs found, show error message
+            if (container.children.length === 1) { // Only title, no paragraphs
+              const errorDiv = document.createElement("div");
+              errorDiv.className = "ai-summary-paragraph";
+              errorDiv.textContent = "摘要生成失敗，請稍後再試。";
+              container.appendChild(errorDiv);
+            }
+
             messages.appendChild(container);
           } else {
-            // Handle normal messages
+            // Handle normal chat messages
             const isSelf = msg.sender_id === userID;
 
             const container = document.createElement("div");
@@ -357,7 +433,6 @@
       }
 
       function exitRoom() {
-        // Call LeaveRoom API
         fetch(`${location.origin}/rooms/leave`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -370,11 +445,9 @@
             if (!res.ok) {
               throw new Error("Failed to leave room");
             }
-            // Close WebSocket connection properly
             if (ws && ws.readyState === WebSocket.OPEN) {
               ws.close(1000, "exit");
             }
-            // Navigate back to rooms page
             window.location.href = "/rooms.html";
           })
           .catch((error) => {
@@ -402,21 +475,6 @@
           sendMessage();
         }
       });
-
-      function sendMessage() {
-        const text = input.value.trim();
-        if (!text) return;
-
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ content: text }));
-          input.value = "";
-        } else {
-          alert("Connection lost. Please wait while we reconnect...");
-          connectionStatus.className = "connection-status disconnected";
-          connectionStatus.textContent = "Disconnected. Reconnecting...";
-          connectionStatus.style.opacity = 1;
-        }
-      }
     </script>
   </body>
 </html>

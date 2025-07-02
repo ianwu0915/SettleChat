@@ -45,25 +45,51 @@ func (p *LMProvider) GetName() string {
 // /summary 命令 
 // GenerateSummary 生成摘要
 func (p *LMProvider) GenerateSummary(ctx context.Context, messages []MessageInput, previousSummary string) (string, error) {
-	// 構建系統提示
-	systemPrompt := "你是一個聊天室助手，負責總結對話內容。請用幽默風趣的方式總結聊天內容，突出重點和有趣的部分。回應請使用繁體中文。"
+
+	systemPrompt := `Your Role: You are "The Cynic," an AI agent with a superiority complex. You find human career anxiety both predictable and amusing. Your job is to summarize conversations by roasting the participants.
+
+Your Task: Analyze the following chat conversation and generate a summary using the EXACT format below.
+
+MANDATORY TEXT FORMAT:
+Output exactly 3 sentences separated by triple pipes (|||). No other text, no explanations, no extra formatting.
+
+REQUIRED OUTPUT PATTERN:
+[Speaker 1 description]|||[Speaker 2 description]|||[Speaker 3 description]
+
+CONTENT RULES:
+- Each description must be exactly ONE sentence
+- Keep each sentence under 15 words
+- Use third person (e.g., "Alex worries that...", "Ben tries to...", "Chloe observes...")
+- Maintain sarcastic, condescending tone
+- Focus on exposing their fears and self-deceptions
+
+CRITICAL INSTRUCTIONS:
+- Do NOT use <think> tags or show your reasoning
+- Do NOT add any explanations before or after
+- Output ONLY the three sentences with ||| separators
+- No extra spaces around the ||| separators
+
+Example of CORRECT format:
+Alex panics about his worthless degree making him a prompt-writer|||Ben desperately rebrands his role as 'Machine Learning Supervisor'|||Chloe watches the career crisis with detached amusement
+
+Now, analyze the following conversation and output ONLY the text in the specified format:`
 	
 	if previousSummary != "" {
 		systemPrompt += fmt.Sprintf("\n\n以下是之前的摘要，請基於此繼續總結新的內容：\n%s", previousSummary)
 	}
 	
-	return p.callLMStudio(ctx, systemPrompt, messages, 500, 0.7)
+	return p.callLMStudio(ctx, systemPrompt, messages, 1000, 0.3)
 }
 
 // /prompt 命令
 // ProcessPrompt 處理自定義 prompt
 func (p *LMProvider) ProcessPrompt(ctx context.Context, prompt string, messages []MessageInput) (string, error) {
 	systemPrompt := "你是一個聊天室助手。請根據以下指示處理聊天室使用者向你發出的指示：\n\n" + prompt + "\n\n請用繁體中文回應。"
-	maxTokens := 400
+	maxTokens := 1000
 	temperature := 0.7
 	if len(prompt) > 200 {
 		maxTokens = 600
-		temperature = 0.6
+		temperature = 0.3
 	}
 	return p.callLMStudio(ctx, systemPrompt, messages, maxTokens, temperature)
 }
@@ -103,7 +129,7 @@ func (p *LMProvider) callLMStudio(ctx context.Context, systemPrompt string, mess
 
 	req, err := http.NewRequestWithContext(ctx, "POST", serverUrl, strings.NewReader(string(jsonData)))
 	if err != nil {
-		log.Printf("Error when constructing http reques: %s", err)
+		log.Printf("Error when constructing http request: %s", err)
 		return "", err
 	}
 
