@@ -8,6 +8,14 @@
 [![PostgreSQL](https://img.shields.io/badge/database-PostgreSQL-blue.svg)](https://postgresql.org)
 [![Docker](https://img.shields.io/badge/deployment-Docker-blue.svg)](https://docker.com)
 
+## 🎬 Demo
+
+[![SettleChat Demo](web/asset/settlechat.gif)](https://youtu.be/IQmTAcOmLDs)
+
+_Real-time chat with AI-powered features, multi-room support, and intelligent conversation assistance_
+
+**📺 [Watch Full Demo on YouTube](https://youtu.be/IQmTAcOmLDs)**
+
 ## 🚀 Overview
 
 SettleChat is a modern, scalable real-time chat application that combines traditional messaging with AI-powered collaboration features. Built with Go's performance and NATS' distributed messaging capabilities, it provides intelligent conversation assistance, automatic summarization, and seamless team collaboration tools.
